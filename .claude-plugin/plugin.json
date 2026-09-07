@@ -1,0 +1,13 @@
+{
+  "name": "redmine",
+  "displayName": "Redmine",
+  "version": "0.1.0",
+  "description": "Work with Redmine (issues, time tracking, projects) directly via its REST API — no server to run, uses curl.",
+  "author": {
+    "name": "Viktor Shirokov",
+    "email": "v.shirokov89@gmail.com"
+  },
+  "homepage": "https://github.com/vshirokov89/redmine-mcp",
+  "license": "MIT",
+  "keywords": ["redmine", "issues", "project-management", "time-tracking"]
+}

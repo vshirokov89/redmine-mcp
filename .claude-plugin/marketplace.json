@@ -1,0 +1,14 @@
+{
+  "name": "redmine-mcp",
+  "owner": {
+    "name": "Viktor Shirokov",
+    "email": "v.shirokov89@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "redmine",
+      "source": "./",
+      "description": "Work with Redmine (issues, time tracking, projects) via its REST API using curl — no server required."
+    }
+  ]
+}

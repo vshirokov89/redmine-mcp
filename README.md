@@ -1,77 +1,98 @@
-# Redmine MCP-коннектор
+# Redmine для Claude Code
 
-MCP-сервер, дающий Claude инструменты для работы с Redmine через REST API.
+Работа с Redmine (задачи, учёт времени, проекты и справочники) прямо из Claude Code.
 
-## Возможности
+Есть два способа — выберите один:
 
-**Задачи**
-- `list_issues` — поиск задач с фильтрами (проект, статус, исполнитель, трекер, текст)
-- `get_issue` — задача целиком (с комментариями, вложениями, связями, подзадачами)
-- `create_issue` — создание задачи/подзадачи
-- `update_issue` — изменение полей и/или добавление комментария
-- `add_issue_comment` — только комментарий
+- **Плагин (skill на curl)** — рекомендуется. Ничего не разворачивать, никаких зависимостей: Claude сам ходит в Redmine REST API через `curl`.
+- **MCP-сервер (Python)** — структурированные инструменты, но нужен `uv`/Python.
 
-**Учёт времени**
-- `list_time_entries` — записи о времени (по задаче/проекту/пользователю/датам)
-- `create_time_entry` — залогировать часы на задачу или проект
+---
 
-**Проекты и справочники**
-- `list_projects`, `get_project`
-- `list_statuses`, `list_trackers`, `list_priorities`, `list_time_entry_activities`
-- `list_users`, `current_user`
+## Способ 1 — Плагин (без сервера) ⭐
 
-## Требования
+### Установка
 
-- **API-ключ Redmine**: в Redmine → «Моя учётная запись» → «Ключ доступа к API».
-- REST API должен быть включён на сервере: Администрирование → Настройки → Аутентификация → «Включить веб-сервис REST».
-- **uv** (менеджер Python, ставит нужный Python и зависимости сам).
+В Claude Code:
 
-## Установка uv (один раз)
+```
+/plugin marketplace add vshirokov89/redmine-mcp
+/plugin install redmine@redmine-mcp
+```
+
+### Настройка доступа
+
+Задайте адрес и API-ключ Redmine одним из способов.
+
+Вариант А — переменные окружения (например, в `~/.zshrc`):
+
+```bash
+export REDMINE_URL="https://redmine.example.com"
+export REDMINE_API_KEY="ваш_ключ"
+```
+
+Вариант Б — файл конфигурации:
+
+```bash
+mkdir -p ~/.config/redmine
+cat > ~/.config/redmine/config <<'EOF'
+REDMINE_URL="https://redmine.example.com"
+REDMINE_API_KEY="ваш_ключ"
+EOF
+chmod 600 ~/.config/redmine/config
+```
+
+API-ключ: в Redmine → «Моя учётная запись» → «Ключ доступа к API».
+
+### Использование
+
+Просто просите на естественном языке, например:
+- «Покажи мои открытые задачи в проекте website»
+- «Заведи задачу в проекте backend: не грузится отчёт»
+- «Залогируй 2 часа на задачу #1234, работал над API»
+- «Что я списал по времени за эту неделю?»
+
+Что умеет: поиск/просмотр/создание/обновление/комментирование задач; просмотр и логирование времени; список проектов, статусов, трекеров, приоритетов, активностей, пользователей.
+
+---
+
+## Способ 2 — MCP-сервер (Python)
+
+Файл сервера: [`redmine_mcp.py`](redmine_mcp.py). Даёт те же операции в виде MCP-инструментов.
+
+Требуется [`uv`](https://docs.astral.sh/uv/) (сам поставит нужный Python и зависимости):
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-После установки перезапустите терминал (или `source ~/.zshrc`), проверьте: `uv --version`.
-
-## Проверка вручную
+Проверка запуска:
 
 ```bash
 REDMINE_URL="https://redmine.example.com" REDMINE_API_KEY="ваш_ключ" uv run redmine_mcp.py
 ```
 
-Сервер запустится и будет ждать MCP-подключение по stdio (Ctrl+C для выхода). Ошибок при старте быть не должно.
-
-## Подключение к Claude Code
-
-Замените путь, URL и ключ на свои:
+Подключение к Claude Code:
 
 ```bash
 claude mcp add redmine \
   -e REDMINE_URL="https://redmine.example.com" \
   -e REDMINE_API_KEY="ваш_ключ" \
-  -- uv run "/полный/путь/к/redmine_mcp.py"
+  -- uv run "$HOME/redmine-mcp/redmine_mcp.py"
 ```
 
-Либо вручную добавьте в `.mcp.json` (в корне проекта) или в пользовательский конфиг:
+Опционально `REDMINE_VERIFY_SSL="false"` — для самоподписанного сертификата.
 
-```json
-{
-  "mcpServers": {
-    "redmine": {
-      "command": "uv",
-      "args": ["run", "/полный/путь/к/redmine_mcp.py"],
-      "env": {
-        "REDMINE_URL": "https://redmine.example.com",
-        "REDMINE_API_KEY": "ваш_ключ"
-      }
-    }
-  }
-}
-```
+---
 
-Опционально: `REDMINE_VERIFY_SSL="false"` — если у Redmine самоподписанный сертификат.
+## Требования на стороне Redmine
+
+REST API должен быть включён: Администрирование → Настройки → Аутентификация → «Включить веб-сервис REST». Все действия выполняются от имени владельца API-ключа с его правами.
 
 ## Безопасность
 
-Не коммитьте API-ключ в репозиторий. Держите его в `env` конфига MCP или в переменных окружения, а не в самом коде.
+Не коммитьте API-ключ в репозиторий. Держите его в переменных окружения или в `~/.config/redmine/config` (с правами `600`).
+
+## Лицензия
+
+MIT
