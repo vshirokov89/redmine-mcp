@@ -1,0 +1,50 @@
+/**
+ * Cloudflare Worker config for the Redmine remote MCP connector.
+ * Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+ *
+ * Secrets (set in the Cloudflare dashboard → Settings → Variables and Secrets,
+ * or via `npx wrangler secret put <NAME>`):
+ *   GITHUB_CLIENT_ID       - from your GitHub OAuth App
+ *   GITHUB_CLIENT_SECRET   - from your GitHub OAuth App
+ *   COOKIE_ENCRYPTION_KEY  - any random string, e.g. `openssl rand -hex 32`
+ *   REDMINE_API_KEY        - your Redmine "API access key" (single-user mode)
+ *
+ * Non-secret var REDMINE_URL is set below.
+ * The KV namespace id must be filled in after you create it (see README).
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "redmine-mcp",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-03-10",
+	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		"REDMINE_URL": "https://rm.egspace.ru"
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": ["MyMCP"],
+			"tag": "v1"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "MyMCP",
+				"name": "MCP_OBJECT"
+			}
+		]
+	},
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "<PUT-YOUR-KV-NAMESPACE-ID-HERE>"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"dev": {
+		"port": 8788
+	}
+}

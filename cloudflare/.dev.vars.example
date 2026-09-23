@@ -1,0 +1,5 @@
+GITHUB_CLIENT_ID=<your github oauth app client id>
+GITHUB_CLIENT_SECRET=<your github oauth app client secret>
+COOKIE_ENCRYPTION_KEY=<any random string, e.g. output of: openssl rand -hex 32>
+REDMINE_URL=https://rm.egspace.ru
+REDMINE_API_KEY=<your redmine api access key>
