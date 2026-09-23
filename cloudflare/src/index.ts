@@ -15,10 +15,24 @@ type Props = {
 };
 
 /**
- * GitHub usernames allowed to use this connector. In single-user mode this is
- * just the owner. Anyone else can authenticate but gets no Redmine tools.
+ * GitHub usernames allowed to use this connector, read from the
+ * ALLOWED_GITHUB_USERNAMES var (comma-separated) in wrangler.jsonc. Anyone else
+ * can authenticate but gets no Redmine tools. Falls back to "vshirokov89" if the
+ * var is unset. Comparison is case-insensitive.
  */
-const ALLOWED_USERNAMES = new Set<string>(["vshirokov89"]);
+function allowedUsernames(env: Env): Set<string> {
+	const raw = env.ALLOWED_GITHUB_USERNAMES ?? "vshirokov89";
+	return new Set(
+		raw
+			.split(",")
+			.map((s) => s.trim().toLowerCase())
+			.filter(Boolean),
+	);
+}
+
+function isAllowed(env: Env, login: string): boolean {
+	return allowedUsernames(env).has(login.toLowerCase());
+}
 
 // ---------------------------------------------------------------------------
 // Redmine REST helpers
@@ -93,7 +107,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"Show the authenticated GitHub identity, whether this account may use Redmine tools, and the connected Redmine user.",
 			{},
 			async () => {
-				const allowed = ALLOWED_USERNAMES.has(this.props!.login);
+				const allowed = isAllowed(env, this.props!.login);
 				const lines = [
 					`GitHub: ${this.props!.name} (@${this.props!.login})`,
 					`Access to Redmine tools: ${allowed ? "yes" : "no"}`,
@@ -108,7 +122,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
-		if (!ALLOWED_USERNAMES.has(this.props!.login)) return;
+		if (!isAllowed(env, this.props!.login)) return;
 
 		// ----- Issues -----
 		this.server.tool(

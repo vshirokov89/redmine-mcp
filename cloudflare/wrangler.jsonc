@@ -19,7 +19,10 @@
 	"compatibility_date": "2025-03-10",
 	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
-		"REDMINE_URL": "https://rm.egspace.ru"
+		"REDMINE_URL": "https://rm.egspace.ru",
+		// Comma-separated GitHub logins allowed to use the Redmine tools.
+		// A colleague deploying their own copy puts their own GitHub login here.
+		"ALLOWED_GITHUB_USERNAMES": "vshirokov89"
 	},
 	"migrations": [
 		{

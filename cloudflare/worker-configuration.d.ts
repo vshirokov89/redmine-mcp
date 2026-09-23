@@ -10,6 +10,7 @@ declare namespace Cloudflare {
 		COOKIE_ENCRYPTION_KEY: string;
 		REDMINE_URL: string;
 		REDMINE_API_KEY: string;
+		ALLOWED_GITHUB_USERNAMES: string;
 		MCP_OBJECT: DurableObjectNamespace<import("./src/index").MyMCP>;
 	}
 }
