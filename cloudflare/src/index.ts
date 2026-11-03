@@ -100,6 +100,19 @@ const CUSTOM_FIELDS_SCHEMA = z
 	.optional()
 	.describe("Custom field values: [{id, value}]; value is a string, or array of strings for multi-value fields");
 
+/** One file to attach inline (e.g. at issue creation). Source: url, base64, or text. */
+const ATTACHMENT_SCHEMA = z
+	.object({
+		filename: z.string(),
+		url: z.string().optional().describe("http(s) URL to fetch the file from"),
+		content_base64: z.string().optional().describe("Base64-encoded bytes (a data: URL is also accepted)"),
+		text_content: z.string().optional().describe("Plain-text content"),
+		content_type: z.string().optional(),
+		description: z.string().optional(),
+	})
+	.optional()
+	.describe("Optionally attach one file. Provide filename plus one of url / content_base64 / text_content.");
+
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 /**
@@ -213,12 +226,18 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				created_on: z.string().optional().describe("Operator filter, e.g. '>=2026-01-01' or '><2026-01-01|2026-02-01'"),
 				updated_on: z.string().optional().describe("Operator filter, same format as created_on"),
 				include: z.string().optional().describe("Comma list: attachments, relations"),
+				custom_field_filters: z
+					.array(z.object({ id: z.number(), value: z.string() }))
+					.optional()
+					.describe(
+						"Filter by custom fields: [{id, value}] → cf_<id>=value. value may carry an operator, e.g. '123' or '>=10'. The field must be enabled as a filter in Redmine.",
+					),
 				sort: z.string().optional().describe("e.g. 'updated_on:desc'"),
 				limit: z.number().min(1).max(100).default(25),
 				offset: z.number().min(0).default(0),
 			},
 			async (a) => {
-				const params = clean({
+				const params: Record<string, string | number | undefined> = clean({
 					query_id: a.query_id,
 					project_id: a.project_id,
 					subproject_id: a.subproject_id,
@@ -238,6 +257,9 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					limit: a.limit,
 					offset: a.offset,
 				});
+				if (a.custom_field_filters) {
+					for (const f of a.custom_field_filters) params[`cf_${f.id}`] = f.value;
+				}
 				return toResult(await redmineFetch(env, "GET", "/issues.json", { params }));
 			},
 		);
@@ -281,9 +303,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				is_private: z.boolean().optional(),
 				watcher_user_ids: z.array(z.number()).optional().describe("User ids to add as watchers"),
 				custom_fields: CUSTOM_FIELDS_SCHEMA,
+				attachment: ATTACHMENT_SCHEMA,
 			},
 			async (a) => {
-				const issue = clean({
+				const issue: Record<string, unknown> = clean({
 					project_id: a.project_id,
 					subject: a.subject,
 					description: a.description,
@@ -302,6 +325,29 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					is_private: a.is_private,
 					watcher_user_ids: a.watcher_user_ids,
 				});
+				// Optional inline attachment: upload the file, then reference its token.
+				if (a.attachment) {
+					const resolved = await resolveUploadBytes(a.attachment);
+					if ("error" in resolved) return { content: [{ type: "text", text: resolved.error }], isError: true };
+					if (resolved.bytes.byteLength > MAX_UPLOAD_BYTES)
+						return {
+							content: [{ type: "text", text: `Attachment too large (limit ${MAX_UPLOAD_BYTES} bytes).` }],
+							isError: true,
+						};
+					const up = await redmineUpload(env, a.attachment.filename, resolved.bytes);
+					if (up.status >= 400) return toResult(up);
+					const token = (up.data as { upload?: { token?: string } }).upload?.token;
+					if (!token)
+						return { content: [{ type: "text", text: `Upload returned no token (HTTP ${up.status}).` }], isError: true };
+					issue.uploads = [
+						clean({
+							token,
+							filename: a.attachment.filename,
+							content_type: resolved.ctype,
+							description: a.attachment.description,
+						}),
+					];
+				}
 				return toResult(await redmineFetch(env, "POST", "/issues.json", { body: { issue } }));
 			},
 		);
