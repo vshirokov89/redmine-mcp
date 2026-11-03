@@ -75,6 +75,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Какие есть статусы и трекеры?»
 - «Кто я в Redmine?» (инструмент whoami / current_user)
 
+**Вики**
+- «Покажи список вики-страниц проекта CRM»
+- «Открой вики-страницу "Инструкции" проекта CRM»
+- «Добавь в конец вики-страницы "Инструкции" проекта CRM раздел про VPN» (Claude сам прочитает текущий текст и сохранит обновлённый)
+
 **Файлы проекта**
 - «Покажи файлы проекта CRM»
 - «Загрузи в проекте CRM файл по ссылке https://… под именем release.zip»
@@ -89,7 +94,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Создай в CRM версию "Релиз 2026.1" со сроком 2026-12-31»
 - «Закрой версию 15» (status=closed)
 
-## Что умеет коннектор (69 инструментов)
+## Что умеет коннектор (73 инструмента)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -124,6 +129,9 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `update_project` | Изменить проект |
 | `archive_project` / `unarchive_project` | Архивировать / вернуть (Redmine 5.0+) |
 | `delete_project` | Удалить проект (необратимо, с `confirm`) |
+| `list_wiki_pages` / `get_wiki_page` | Вики: список страниц / страница (с версиями) |
+| `save_wiki_page` | Создать/обновить вики-страницу (+ вложение) |
+| `delete_wiki_page` | Удалить вики-страницу (необратимо, с `confirm`) |
 | `list_project_files` | Файлы проекта (модуль «Файлы») |
 | `upload_project_file` | Загрузить файл в проект (URL / base64 / текст) |
 | `list_issue_categories` / `get_issue_category` | Категории задач проекта / одна категория |
@@ -167,10 +175,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `update_version`, `delete_version`, `create_group`, `update_group`,
 `add_group_user`, `remove_group_user`, `delete_group`, `create_membership`,
 `update_membership`, `delete_membership`, `create_user`, `update_user`,
-`delete_user`, `update_time_entry`, `delete_time_entry`) — Needs approval,
+`delete_user`, `update_time_entry`, `delete_time_entry`, `save_wiki_page`,
+`delete_wiki_page`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**, **`delete_user`**,
-**`delete_group`**: держите на Needs approval, а лучше на **Never**, если не нужны.
+**`delete_group`**, **`delete_wiki_page`**: держите на Needs approval, а лучше на **Never**, если не нужны.
 
 ## Важно знать
 

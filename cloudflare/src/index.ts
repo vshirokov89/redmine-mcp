@@ -1491,6 +1491,106 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Wiki pages -----
+		this.server.tool(
+			"list_wiki_pages",
+			"List all wiki pages of a project (title, parent, version, dates).",
+			{ project_id: z.string().describe("Numeric id or identifier") },
+			async (a) => toResult(await redmineFetch(env, "GET", `/projects/${a.project_id}/wiki/index.json`)),
+		);
+
+		this.server.tool(
+			"get_wiki_page",
+			"Get a wiki page by title (text, author, version, comments). Pass version for an old revision.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				title: z.string().describe("Page title (spaces are fine)"),
+				version: z.number().optional().describe("Fetch this historical version"),
+				include: z.string().optional().describe("Comma list: attachments"),
+			},
+			async (a) => {
+				const base = `/projects/${a.project_id}/wiki/${encodeURIComponent(a.title)}`;
+				const path = a.version ? `${base}/${a.version}.json` : `${base}.json`;
+				return toResult(await redmineFetch(env, "GET", path, { params: clean({ include: a.include }) }));
+			},
+		);
+
+		this.server.tool(
+			"save_wiki_page",
+			"Create or update a wiki page (PUT). text is REQUIRED and replaces the page body — to edit, fetch the page first with get_wiki_page, change the text, then resend it whole. Pass version to avoid overwriting concurrent edits (stale version → 409).",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				title: z.string().describe("Page title (created if it doesn't exist)"),
+				text: z.string().describe("Full page body (wiki/textile/markdown). Replaces existing text."),
+				comments: z.string().optional().describe("Edit comment"),
+				parent_title: z.string().optional().describe("Parent page title; omit for a root page"),
+				version: z.number().optional().describe("Expected current version, for conflict detection"),
+				attachment: ATTACHMENT_SCHEMA,
+			},
+			async (a) => {
+				const wiki_page: Record<string, unknown> = clean({
+					text: a.text,
+					comments: a.comments,
+					parent_title: a.parent_title,
+					version: a.version,
+				});
+				if (a.attachment) {
+					const resolved = await resolveUploadBytes(a.attachment);
+					if ("error" in resolved) return { content: [{ type: "text", text: resolved.error }], isError: true };
+					if (resolved.bytes.byteLength > MAX_UPLOAD_BYTES)
+						return {
+							content: [{ type: "text", text: `Attachment too large (limit ${MAX_UPLOAD_BYTES} bytes).` }],
+							isError: true,
+						};
+					const up = await redmineUpload(env, a.attachment.filename, resolved.bytes);
+					if (up.status >= 400) return toResult(up);
+					const token = (up.data as { upload?: { token?: string } }).upload?.token;
+					if (!token)
+						return { content: [{ type: "text", text: `Upload returned no token (HTTP ${up.status}).` }], isError: true };
+					wiki_page.uploads = [
+						clean({
+							token,
+							filename: a.attachment.filename,
+							content_type: resolved.ctype,
+							description: a.attachment.description,
+						}),
+					];
+				}
+				const r = await redmineFetch(
+					env,
+					"PUT",
+					`/projects/${a.project_id}/wiki/${encodeURIComponent(a.title)}.json`,
+					{ body: { wiki_page } },
+				);
+				if (r.status === 201) return { content: [{ type: "text", text: `Wiki page "${a.title}" created.` }] };
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Wiki page "${a.title}" updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_wiki_page",
+			"DANGER: delete a wiki page, including its attachments and history. Child pages become root pages. Irreversible.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				title: z.string(),
+				confirm: z.boolean().describe("Must be true to proceed."),
+			},
+			async (a) => {
+				if (!a.confirm)
+					return { content: [{ type: "text", text: "Deletion not confirmed. Pass confirm=true." }], isError: true };
+				const r = await redmineFetch(
+					env,
+					"DELETE",
+					`/projects/${a.project_id}/wiki/${encodeURIComponent(a.title)}.json`,
+				);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Wiki page "${a.title}" deleted.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>
