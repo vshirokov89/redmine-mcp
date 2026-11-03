@@ -809,7 +809,9 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				project_id: z.string().optional(),
 				spent_on: z.string().optional().describe("YYYY-MM-DD; defaults to today"),
 				activity_id: z.number().optional(),
-				comments: z.string().optional(),
+				comments: z.string().optional().describe("Max 255 chars"),
+				user_id: z.number().optional().describe("Log on behalf of another user (needs rights)"),
+				custom_fields: CUSTOM_FIELDS_SCHEMA,
 			},
 			async (a) => {
 				if (!a.issue_id && !a.project_id) {
@@ -825,8 +827,63 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					spent_on: a.spent_on,
 					activity_id: a.activity_id,
 					comments: a.comments,
+					user_id: a.user_id,
+					custom_fields: a.custom_fields,
 				});
 				return toResult(await redmineFetch(env, "POST", "/time_entries.json", { body: { time_entry } }));
+			},
+		);
+
+		this.server.tool(
+			"get_time_entry",
+			"Get one time entry by id.",
+			{ time_entry_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/time_entries/${a.time_entry_id}.json`)),
+		);
+
+		this.server.tool(
+			"update_time_entry",
+			"Update a time entry (hours, activity, comments, date, etc.).",
+			{
+				time_entry_id: z.number(),
+				hours: z.number().positive().optional(),
+				issue_id: z.number().optional(),
+				project_id: z.string().optional(),
+				spent_on: z.string().optional().describe("YYYY-MM-DD"),
+				activity_id: z.number().optional(),
+				comments: z.string().optional().describe("Max 255 chars"),
+				user_id: z.number().optional(),
+				custom_fields: CUSTOM_FIELDS_SCHEMA,
+			},
+			async (a) => {
+				const time_entry = clean({
+					hours: a.hours,
+					issue_id: a.issue_id,
+					project_id: a.project_id,
+					spent_on: a.spent_on,
+					activity_id: a.activity_id,
+					comments: a.comments,
+					user_id: a.user_id,
+					custom_fields: a.custom_fields,
+				});
+				if (Object.keys(time_entry).length === 0)
+					return { content: [{ type: "text", text: "Nothing to update: provide at least one field." }], isError: true };
+				const r = await redmineFetch(env, "PUT", `/time_entries/${a.time_entry_id}.json`, { body: { time_entry } });
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Time entry ${a.time_entry_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_time_entry",
+			"Delete a time entry. Removes the logged time (irreversible).",
+			{ time_entry_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "DELETE", `/time_entries/${a.time_entry_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Time entry ${a.time_entry_id} deleted.` }] };
+				return toResult(r);
 			},
 		);
 
