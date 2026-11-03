@@ -199,6 +199,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"list_issues",
 			"Search Redmine issues. Defaults to open issues; pass status_id='*' for all or 'closed' for closed.",
 			{
+				query_id: z.number().optional().describe("Run a saved query by id (see list_queries)"),
 				project_id: z.string().optional().describe("Project identifier or numeric id"),
 				subproject_id: z.string().optional().describe("Subproject filter; '!*' excludes subprojects"),
 				status_id: z.string().optional().describe("Status id, or 'open' | 'closed' | '*'"),
@@ -218,9 +219,11 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 			async (a) => {
 				const params = clean({
+					query_id: a.query_id,
 					project_id: a.project_id,
 					subproject_id: a.subproject_id,
-					status_id: a.status_id ?? "open",
+					// A saved query defines its own status filter, so don't force the default there.
+					status_id: a.status_id ?? (a.query_id ? undefined : "open"),
 					assigned_to_id: a.assigned_to_id,
 					author_id: a.author_id,
 					tracker_id: a.tracker_id,
@@ -887,6 +890,13 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"List custom field definitions (id, name, field_format, possible_values, ...). Requires admin rights in Redmine. Use to find field ids/formats for the custom_fields argument of create_issue/update_issue.",
 			{},
 			async () => toResult(await redmineFetch(env, "GET", "/custom_fields.json")),
+		);
+		this.server.tool(
+			"list_queries",
+			"List saved custom queries visible to you (id, name, is_public, project_id). Run one with list_issues(query_id=...).",
+			{ limit: z.number().min(1).max(100).default(100), offset: z.number().min(0).default(0) },
+			async (a) =>
+				toResult(await redmineFetch(env, "GET", "/queries.json", { params: { limit: a.limit, offset: a.offset } })),
 		);
 		this.server.tool("list_trackers", "List trackers / issue types (id + name).", {}, async () =>
 			toResult(await redmineFetch(env, "GET", "/trackers.json")),
