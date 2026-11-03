@@ -66,7 +66,12 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Создай в CRM категорию "Поддержка", исполнитель по умолчанию — пользователь 41»
 - «Удали категорию 7, а её задачи перенеси в категорию 3»
 
-## Что умеет коннектор (42 инструмента)
+**Версии (вехи)**
+- «Покажи версии проекта CRM»
+- «Создай в CRM версию "Релиз 2026.1" со сроком 2026-12-31»
+- «Закрой версию 15» (status=closed)
+
+## Что умеет коннектор (47 инструментов)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -103,6 +108,9 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `list_issue_categories` / `get_issue_category` | Категории задач проекта / одна категория |
 | `create_issue_category` / `update_issue_category` | Создать / изменить категорию |
 | `delete_issue_category` | Удалить категорию (с опц. переносом задач) |
+| `list_versions` / `get_version` | Версии (вехи) проекта / одна версия |
+| `create_version` / `update_version` | Создать / изменить версию |
+| `delete_version` | Удалить версию |
 | `list_statuses` | Статусы задач (id, name, is_closed) |
 | `list_trackers` | Трекеры (типы задач) |
 | `list_priorities` | Приоритеты |
@@ -123,7 +131,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `add_issue_comment`, `create_time_entry`, `create_project`, `update_project`,
 `archive_project`, `unarchive_project`, `attach_file_to_issue`, `upload_project_file`,
 `create_issue_relation`, `delete_issue_relation`, `create_issue_category`,
-`update_issue_category`, `delete_issue_category`) — Needs approval,
+`update_issue_category`, `delete_issue_category`, `create_version`,
+`update_version`, `delete_version`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**: держите на Needs approval,
 а лучше на **Never**, если не нужны.

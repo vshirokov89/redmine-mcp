@@ -1053,6 +1053,90 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Versions -----
+		this.server.tool(
+			"list_versions",
+			"List a project's versions/milestones (may include shared versions).",
+			{ project_id: z.string().describe("Numeric id or identifier") },
+			async (a) => toResult(await redmineFetch(env, "GET", `/projects/${a.project_id}/versions.json`)),
+		);
+
+		this.server.tool(
+			"get_version",
+			"Get one version by id (includes estimated_hours and spent_hours).",
+			{ version_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/versions/${a.version_id}.json`)),
+		);
+
+		this.server.tool(
+			"create_version",
+			"Create a version/milestone in a project.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				name: z.string(),
+				status: z.enum(["open", "locked", "closed"]).optional(),
+				sharing: z.enum(["none", "descendants", "hierarchy", "tree", "system"]).optional(),
+				due_date: z.string().optional().describe("YYYY-MM-DD"),
+				description: z.string().optional(),
+				wiki_page_title: z.string().optional(),
+			},
+			async (a) => {
+				const version = clean({
+					name: a.name,
+					status: a.status,
+					sharing: a.sharing,
+					due_date: a.due_date,
+					description: a.description,
+					wiki_page_title: a.wiki_page_title,
+				});
+				return toResult(
+					await redmineFetch(env, "POST", `/projects/${a.project_id}/versions.json`, { body: { version } }),
+				);
+			},
+		);
+
+		this.server.tool(
+			"update_version",
+			"Update a version/milestone.",
+			{
+				version_id: z.number(),
+				name: z.string().optional(),
+				status: z.enum(["open", "locked", "closed"]).optional(),
+				sharing: z.enum(["none", "descendants", "hierarchy", "tree", "system"]).optional(),
+				due_date: z.string().optional().describe("YYYY-MM-DD"),
+				description: z.string().optional(),
+				wiki_page_title: z.string().optional(),
+			},
+			async (a) => {
+				const version = clean({
+					name: a.name,
+					status: a.status,
+					sharing: a.sharing,
+					due_date: a.due_date,
+					description: a.description,
+					wiki_page_title: a.wiki_page_title,
+				});
+				if (Object.keys(version).length === 0)
+					return { content: [{ type: "text", text: "Nothing to update: provide at least one field." }], isError: true };
+				const r = await redmineFetch(env, "PUT", `/versions/${a.version_id}.json`, { body: { version } });
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Version ${a.version_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_version",
+			"Delete a version/milestone. Issues assigned to it will have their target version cleared.",
+			{ version_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "DELETE", `/versions/${a.version_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Version ${a.version_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>
