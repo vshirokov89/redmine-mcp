@@ -1227,6 +1227,72 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Memberships -----
+		this.server.tool(
+			"list_memberships",
+			"List a project's members (users/groups and their roles).",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				limit: z.number().min(1).max(100).default(100),
+				offset: z.number().min(0).default(0),
+			},
+			async (a) =>
+				toResult(
+					await redmineFetch(env, "GET", `/projects/${a.project_id}/memberships.json`, {
+						params: { limit: a.limit, offset: a.offset },
+					}),
+				),
+		);
+
+		this.server.tool(
+			"get_membership",
+			"Get one membership by id.",
+			{ membership_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/memberships/${a.membership_id}.json`)),
+		);
+
+		this.server.tool(
+			"create_membership",
+			"Add a user or group to a project with roles. user_id is a user OR group id; role_ids from the Roles list.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				user_id: z.number().describe("User id, or a group id to add a whole group"),
+				role_ids: z.array(z.number()).describe("Role ids to grant"),
+			},
+			async (a) => {
+				const membership = { user_id: a.user_id, role_ids: a.role_ids };
+				return toResult(
+					await redmineFetch(env, "POST", `/projects/${a.project_id}/memberships.json`, { body: { membership } }),
+				);
+			},
+		);
+
+		this.server.tool(
+			"update_membership",
+			"Change a membership's roles (only roles can be changed).",
+			{ membership_id: z.number(), role_ids: z.array(z.number()).describe("New set of role ids") },
+			async (a) => {
+				const r = await redmineFetch(env, "PUT", `/memberships/${a.membership_id}.json`, {
+					body: { membership: { role_ids: a.role_ids } },
+				});
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Membership ${a.membership_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_membership",
+			"Remove a membership from a project. Memberships inherited from a group can't be removed here — remove the group membership instead.",
+			{ membership_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "DELETE", `/memberships/${a.membership_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Membership ${a.membership_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>

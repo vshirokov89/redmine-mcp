@@ -52,6 +52,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Найди по всему Redmine "госключ"»
 - «Поищи "отчёт" только в задачах проекта CRM, по заголовкам»
 
+**Участники проектов**
+- «Покажи участников проекта CRM»
+- «Добавь пользователя 41 в проект CRM с ролью 3»
+- «Поменяй роли участника 58 на 3 и 4»
+
 **Группы** (нужны права администратора)
 - «Покажи группы Redmine»
 - «Создай группу "Аналитики" и добавь туда пользователей 41 и 7»
@@ -76,7 +81,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Создай в CRM версию "Релиз 2026.1" со сроком 2026-12-31»
 - «Закрой версию 15» (status=closed)
 
-## Что умеет коннектор (54 инструмента)
+## Что умеет коннектор (59 инструментов)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -116,6 +121,9 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `list_versions` / `get_version` | Версии (вехи) проекта / одна версия |
 | `create_version` / `update_version` | Создать / изменить версию |
 | `delete_version` | Удалить версию |
+| `list_memberships` / `get_membership` | Участники проекта / одно членство |
+| `create_membership` | Добавить участника/группу с ролями |
+| `update_membership` / `delete_membership` | Изменить роли / убрать участника |
 | `list_statuses` | Статусы задач (id, name, is_closed) |
 | `list_trackers` | Трекеры (типы задач) |
 | `list_priorities` | Приоритеты |
@@ -142,7 +150,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `create_issue_relation`, `delete_issue_relation`, `create_issue_category`,
 `update_issue_category`, `delete_issue_category`, `create_version`,
 `update_version`, `delete_version`, `create_group`, `update_group`,
-`add_group_user`, `remove_group_user`, `delete_group`) — Needs approval,
+`add_group_user`, `remove_group_user`, `delete_group`, `create_membership`,
+`update_membership`, `delete_membership`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**: держите на Needs approval,
 а лучше на **Never**, если не нужны.
