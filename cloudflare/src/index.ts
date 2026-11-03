@@ -962,9 +962,15 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 		);
 		this.server.tool(
 			"list_time_entry_activities",
-			"List time-tracking activities (id + name).",
+			"List time-tracking activities (id, name, is_default).",
 			{},
 			async () => toResult(await redmineFetch(env, "GET", "/enumerations/time_entry_activities.json")),
+		);
+		this.server.tool(
+			"list_document_categories",
+			"List document categories (id, name, is_default).",
+			{},
+			async () => toResult(await redmineFetch(env, "GET", "/enumerations/document_categories.json")),
 		);
 		this.server.tool("current_user", "Get the Redmine account tied to the configured API key.", {}, async () =>
 			toResult(await redmineFetch(env, "GET", "/users/current.json")),
