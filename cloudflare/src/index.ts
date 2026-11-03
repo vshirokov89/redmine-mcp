@@ -535,6 +535,55 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Search -----
+		this.server.tool(
+			"search",
+			"Full-text search across Redmine (issues, wiki, news, documents, messages, projects, changesets). Returns matches with title, type and url. Enable specific resource flags to narrow; leave them off to search everything.",
+			{
+				q: z.string().describe("Search terms, space-separated"),
+				project_id: z.string().optional().describe("Limit to this project (id or identifier)"),
+				scope: z.enum(["all", "my_project", "subprojects"]).optional(),
+				issues: z.boolean().optional(),
+				news: z.boolean().optional(),
+				documents: z.boolean().optional(),
+				changesets: z.boolean().optional(),
+				wiki_pages: z.boolean().optional(),
+				messages: z.boolean().optional(),
+				projects: z.boolean().optional(),
+				titles_only: z.boolean().optional().describe("Match titles only"),
+				all_words: z.boolean().optional().describe("Require all words to match"),
+				open_issues: z.boolean().optional().describe("Only open issues"),
+				attachments: z
+					.enum(["0", "1", "only"])
+					.optional()
+					.describe("0=description only, 1=description+attachments, only=attachments only"),
+				limit: z.number().min(1).max(100).default(25),
+				offset: z.number().min(0).default(0),
+			},
+			async (a) => {
+				const flag = (v?: boolean) => (v ? 1 : undefined);
+				const params = clean({
+					q: a.q,
+					scope: a.scope,
+					issues: flag(a.issues),
+					news: flag(a.news),
+					documents: flag(a.documents),
+					changesets: flag(a.changesets),
+					wiki_pages: flag(a.wiki_pages),
+					messages: flag(a.messages),
+					projects: flag(a.projects),
+					titles_only: flag(a.titles_only),
+					all_words: flag(a.all_words),
+					open_issues: flag(a.open_issues),
+					attachments: a.attachments,
+					limit: a.limit,
+					offset: a.offset,
+				});
+				const path = a.project_id ? `/projects/${a.project_id}/search.json` : "/search.json";
+				return toResult(await redmineFetch(env, "GET", path, { params }));
+			},
+		);
+
 		// ----- Time tracking -----
 		this.server.tool(
 			"list_time_entries",
