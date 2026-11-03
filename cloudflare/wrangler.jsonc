@@ -7,7 +7,12 @@
  *   GITHUB_CLIENT_ID       - from your GitHub OAuth App
  *   GITHUB_CLIENT_SECRET   - from your GitHub OAuth App
  *   COOKIE_ENCRYPTION_KEY  - any random string, e.g. `openssl rand -hex 32`
- *   REDMINE_API_KEY        - your Redmine "API access key" (single-user mode)
+ *   REDMINE_API_KEY        - a single shared Redmine "API access key" (single-user mode)
+ *   REDMINE_USERS          - multi-user mode: single-line JSON mapping GitHub login
+ *                            -> { name, key }, e.g.
+ *                            {"vshirokov89":{"name":"Viktor","key":"abc"},"vpetrov":{"name":"Vasya","key":"def"}}
+ *                            Each signed-in user acts under their own key. Set
+ *                            REDMINE_USERS and/or REDMINE_API_KEY (at least one).
  *
  * Non-secret var REDMINE_URL is set below.
  * The KV namespace id must be filled in after you create it (see README).

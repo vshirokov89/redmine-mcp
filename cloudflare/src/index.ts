@@ -34,6 +34,43 @@ function isAllowed(env: Env, login: string): boolean {
 	return allowedUsernames(env).has(login.toLowerCase());
 }
 
+type RedmineUser = { name?: string; key: string };
+
+/**
+ * Parse the REDMINE_USERS secret: a JSON object mapping GitHub login ->
+ * { name, key }. Keys (logins) are lowercased. Invalid/empty JSON yields {}.
+ * Example: {"vshirokov89":{"name":"Виктор Широков","key":"abc"}}
+ */
+function parseRedmineUsers(env: Env): Record<string, RedmineUser> {
+	const raw = env.REDMINE_USERS;
+	if (!raw) return {};
+	try {
+		const obj = JSON.parse(raw) as Record<string, { name?: string; key?: string }>;
+		const out: Record<string, RedmineUser> = {};
+		for (const [login, v] of Object.entries(obj)) {
+			if (v && typeof v.key === "string" && v.key) out[login.toLowerCase()] = { name: v.name, key: v.key };
+		}
+		return out;
+	} catch {
+		return {};
+	}
+}
+
+/**
+ * Resolve the acting user for a GitHub login: their display name and the Redmine
+ * API key to use. Priority:
+ *   1. REDMINE_USERS map (per-user keys) — the multi-user model.
+ *   2. Legacy: ALLOWED_GITHUB_USERNAMES + the shared REDMINE_API_KEY secret.
+ * Returns null if the login is not permitted.
+ */
+function resolveUser(env: Env, login: string): RedmineUser | null {
+	const l = login.toLowerCase();
+	const mapped = parseRedmineUsers(env)[l];
+	if (mapped) return mapped;
+	if (env.REDMINE_API_KEY && allowedUsernames(env).has(l)) return { key: env.REDMINE_API_KEY };
+	return null;
+}
+
 // ---------------------------------------------------------------------------
 // Redmine REST helpers
 // ---------------------------------------------------------------------------
@@ -182,7 +219,11 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 	server = new McpServer({ name: "Redmine", version: "0.1.0" });
 
 	async init() {
-		const env = this.env;
+		// Resolve the acting user (display name + their own Redmine key) from the
+		// GitHub login. All tools below use `env`, whose REDMINE_API_KEY is set to
+		// THIS user's key, so every request runs under their own Redmine account.
+		const me = resolveUser(this.env, this.props!.login);
+		const env = { ...this.env, REDMINE_API_KEY: me?.key ?? "" } as Env;
 
 		// Always available: identity + access check.
 		this.server.tool(
@@ -190,22 +231,23 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"Show the authenticated GitHub identity, whether this account may use Redmine tools, and the connected Redmine user.",
 			{},
 			async () => {
-				const allowed = isAllowed(env, this.props!.login);
 				const lines = [
 					`GitHub: ${this.props!.name} (@${this.props!.login})`,
-					`Access to Redmine tools: ${allowed ? "yes" : "no"}`,
+					...(me?.name ? [`Name: ${me.name}`] : []),
+					`Access to Redmine tools: ${me ? "yes" : "no"}`,
 				];
-				if (allowed) {
-					const me = await redmineFetch(env, "GET", "/users/current.json");
-					const u = (me.data as { user?: { firstname?: string; lastname?: string; login?: string; id?: number } })?.user;
+				if (me) {
+					const who = await redmineFetch(env, "GET", "/users/current.json");
+					const u = (who.data as { user?: { firstname?: string; lastname?: string; login?: string; id?: number } })
+						?.user;
 					if (u) lines.push(`Redmine: ${u.firstname ?? ""} ${u.lastname ?? ""} (login ${u.login}, id ${u.id})`);
-					else lines.push(`Redmine: could not read current user (HTTP ${me.status})`);
+					else lines.push(`Redmine: could not read current user (HTTP ${who.status})`);
 				}
 				return { content: [{ type: "text", text: lines.join("\n") }] };
 			},
 		);
 
-		if (!isAllowed(env, this.props!.login)) return;
+		if (!me) return;
 
 		// ----- Issues -----
 		this.server.tool(

@@ -11,6 +11,8 @@ declare namespace Cloudflare {
 		REDMINE_URL: string;
 		REDMINE_API_KEY: string;
 		ALLOWED_GITHUB_USERNAMES: string;
+		// JSON map of GitHub login -> { name, key } for per-user Redmine keys.
+		REDMINE_USERS: string;
 		MCP_OBJECT: DurableObjectNamespace<import("./src/index").MyMCP>;
 	}
 }
