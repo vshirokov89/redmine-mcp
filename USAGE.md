@@ -52,6 +52,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Найди по всему Redmine "госключ"»
 - «Поищи "отчёт" только в задачах проекта CRM, по заголовкам»
 
+**Группы** (нужны права администратора)
+- «Покажи группы Redmine»
+- «Создай группу "Аналитики" и добавь туда пользователей 41 и 7»
+- «Добавь пользователя 41 в группу 12»
+
 **Проекты и справочники**
 - «Покажи мои проекты в Redmine»
 - «Какие есть статусы и трекеры?»
@@ -71,7 +76,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Создай в CRM версию "Релиз 2026.1" со сроком 2026-12-31»
 - «Закрой версию 15» (status=closed)
 
-## Что умеет коннектор (47 инструментов)
+## Что умеет коннектор (54 инструмента)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -116,6 +121,10 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `list_priorities` | Приоритеты |
 | `list_time_entry_activities` | Виды деятельности для учёта времени |
 | `list_document_categories` | Категории документов |
+| `list_groups` / `get_group` | Группы / одна группа (admin) |
+| `create_group` / `update_group` | Создать / изменить группу (admin) |
+| `delete_group` | Удалить группу (admin, с `confirm`) |
+| `add_group_user` / `remove_group_user` | Добавить/убрать пользователя в группе (admin) |
 | `list_custom_fields` | Определения кастомных полей (нужны права админа) |
 | `list_queries` | Сохранённые фильтры (запускаются через `list_issues` c `query_id`) |
 
@@ -132,7 +141,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `archive_project`, `unarchive_project`, `attach_file_to_issue`, `upload_project_file`,
 `create_issue_relation`, `delete_issue_relation`, `create_issue_category`,
 `update_issue_category`, `delete_issue_category`, `create_version`,
-`update_version`, `delete_version`) — Needs approval,
+`update_version`, `delete_version`, `create_group`, `update_group`,
+`add_group_user`, `remove_group_user`, `delete_group`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**: держите на Needs approval,
 а лучше на **Never**, если не нужны.

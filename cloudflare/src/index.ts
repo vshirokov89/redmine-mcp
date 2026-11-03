@@ -1137,6 +1137,96 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Groups (admin only) -----
+		this.server.tool(
+			"list_groups",
+			"List all groups (id, name). Requires admin rights.",
+			{},
+			async () => toResult(await redmineFetch(env, "GET", "/groups.json")),
+		);
+
+		this.server.tool(
+			"get_group",
+			"Get one group. Requires admin rights.",
+			{
+				group_id: z.number(),
+				include: z.string().optional().describe("Comma list: users, memberships"),
+			},
+			async (a) =>
+				toResult(
+					await redmineFetch(env, "GET", `/groups/${a.group_id}.json`, {
+						params: clean({ include: a.include }),
+					}),
+				),
+		);
+
+		this.server.tool(
+			"create_group",
+			"Create a group. Requires admin rights.",
+			{ name: z.string(), user_ids: z.array(z.number()).optional().describe("Initial member user ids") },
+			async (a) => {
+				const group = clean({ name: a.name, user_ids: a.user_ids });
+				return toResult(await redmineFetch(env, "POST", "/groups.json", { body: { group } }));
+			},
+		);
+
+		this.server.tool(
+			"update_group",
+			"Update a group's name and/or members. Requires admin rights.",
+			{
+				group_id: z.number(),
+				name: z.string().optional(),
+				user_ids: z.array(z.number()).optional().describe("Replaces the member list"),
+			},
+			async (a) => {
+				const group = clean({ name: a.name, user_ids: a.user_ids });
+				if (Object.keys(group).length === 0)
+					return { content: [{ type: "text", text: "Nothing to update: provide name or user_ids." }], isError: true };
+				const r = await redmineFetch(env, "PUT", `/groups/${a.group_id}.json`, { body: { group } });
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Group ${a.group_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_group",
+			"Delete a group. Requires admin rights.",
+			{ group_id: z.number(), confirm: z.boolean().describe("Must be true to proceed.") },
+			async (a) => {
+				if (!a.confirm)
+					return { content: [{ type: "text", text: "Deletion not confirmed. Pass confirm=true." }], isError: true };
+				const r = await redmineFetch(env, "DELETE", `/groups/${a.group_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Group ${a.group_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"add_group_user",
+			"Add a user to a group. Requires admin rights.",
+			{ group_id: z.number(), user_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "POST", `/groups/${a.group_id}/users.json`, { body: { user_id: a.user_id } });
+				if (r.status === 204 || r.status === 200 || r.status === 201)
+					return { content: [{ type: "text", text: `User ${a.user_id} added to group ${a.group_id}.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"remove_group_user",
+			"Remove a user from a group. Requires admin rights.",
+			{ group_id: z.number(), user_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "DELETE", `/groups/${a.group_id}/users/${a.user_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `User ${a.user_id} removed from group ${a.group_id}.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>
