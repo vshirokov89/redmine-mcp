@@ -133,6 +133,34 @@ function base64ToBytes(b64: string): Uint8Array {
 	return out;
 }
 
+/**
+ * Resolve file bytes from one of three sources: a http(s) url to fetch, base64
+ * content, or plain text. Returns the bytes and a best-guess content type, or an
+ * error string.
+ */
+async function resolveUploadBytes(args: {
+	url?: string;
+	content_base64?: string;
+	text_content?: string;
+	content_type?: string;
+}): Promise<{ bytes: Uint8Array; ctype?: string } | { error: string }> {
+	const ctype = args.content_type;
+	try {
+		if (args.url) {
+			if (!/^https?:\/\//i.test(args.url)) return { error: "url must start with http:// or https://" };
+			const r = await fetch(args.url);
+			if (!r.ok) return { error: `Failed to fetch url (HTTP ${r.status}).` };
+			return { bytes: new Uint8Array(await r.arrayBuffer()), ctype: ctype ?? r.headers.get("content-type") ?? undefined };
+		}
+		if (args.content_base64) return { bytes: base64ToBytes(args.content_base64), ctype };
+		if (args.text_content !== undefined)
+			return { bytes: new TextEncoder().encode(args.text_content), ctype: ctype ?? "text/plain" };
+		return { error: "Provide one of: url, content_base64, text_content." };
+	} catch (e) {
+		return { error: `Could not read file content: ${String(e)}` };
+	}
+}
+
 // ---------------------------------------------------------------------------
 // MCP server
 // ---------------------------------------------------------------------------
@@ -531,6 +559,58 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				const r = await redmineFetch(env, "DELETE", `/attachments/${a.attachment_id}.json`);
 				if (r.status === 204 || r.status === 200)
 					return { content: [{ type: "text", text: `Attachment ${a.attachment_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
+		// ----- Project files -----
+		this.server.tool(
+			"list_project_files",
+			"List files in a project's Files area (id, filename, size, content_type, version, downloads).",
+			{ project_id: z.string().describe("Numeric id or identifier") },
+			async (a) => toResult(await redmineFetch(env, "GET", `/projects/${a.project_id}/files.json`)),
+		);
+
+		this.server.tool(
+			"upload_project_file",
+			"Upload a file to a project's Files area. Provide the file as a URL, base64, or plain text. Optionally attach it to a version.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				filename: z.string(),
+				url: z.string().optional().describe("http(s) URL to fetch the file from"),
+				content_base64: z.string().optional().describe("Base64-encoded bytes (a data: URL is also accepted)"),
+				text_content: z.string().optional().describe("Plain-text content"),
+				content_type: z.string().optional(),
+				version_id: z.number().optional().describe("Attach the file to this version/milestone"),
+				description: z.string().optional(),
+			},
+			async (a) => {
+				const resolved = await resolveUploadBytes(a);
+				if ("error" in resolved) return { content: [{ type: "text", text: resolved.error }], isError: true };
+				const { bytes, ctype } = resolved;
+				if (bytes.byteLength === 0) return { content: [{ type: "text", text: "File is empty." }], isError: true };
+				if (bytes.byteLength > MAX_UPLOAD_BYTES)
+					return {
+						content: [{ type: "text", text: `File too large (${bytes.byteLength} bytes; limit ${MAX_UPLOAD_BYTES}).` }],
+						isError: true,
+					};
+
+				const up = await redmineUpload(env, a.filename, bytes);
+				if (up.status >= 400) return toResult(up);
+				const token = (up.data as { upload?: { token?: string } }).upload?.token;
+				if (!token)
+					return { content: [{ type: "text", text: `Upload returned no token (HTTP ${up.status}).` }], isError: true };
+
+				const file = clean({
+					token,
+					filename: a.filename,
+					version_id: a.version_id,
+					description: a.description,
+					content_type: ctype,
+				});
+				const r = await redmineFetch(env, "POST", `/projects/${a.project_id}/files.json`, { body: { file } });
+				if (r.status === 204 || r.status === 200 || r.status === 201)
+					return { content: [{ type: "text", text: `Uploaded "${a.filename}" to project ${a.project_id}.` }] };
 				return toResult(r);
 			},
 		);

@@ -49,7 +49,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Какие есть статусы и трекеры?»
 - «Кто я в Redmine?» (инструмент whoami / current_user)
 
-## Что умеет коннектор (29 инструментов)
+**Файлы проекта**
+- «Покажи файлы проекта CRM»
+- «Загрузи в проекте CRM файл по ссылке https://… под именем release.zip»
+
+## Что умеет коннектор (31 инструмент)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -78,6 +82,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `update_project` | Изменить проект |
 | `archive_project` / `unarchive_project` | Архивировать / вернуть (Redmine 5.0+) |
 | `delete_project` | Удалить проект (необратимо, с `confirm`) |
+| `list_project_files` | Файлы проекта (модуль «Файлы») |
+| `upload_project_file` | Загрузить файл в проект (URL / base64 / текст) |
 | `list_statuses` | Статусы задач (id, name, is_closed) |
 | `list_trackers` | Трекеры (типы задач) |
 | `list_priorities` | Приоритеты |
@@ -94,7 +100,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 Рекомендуется: инструменты на **чтение** (`list_*`, `get_*`, `current_user`,
 `whoami`) — Always allow; на **запись** (`create_issue`, `update_issue`,
 `add_issue_comment`, `create_time_entry`, `create_project`, `update_project`,
-`archive_project`, `unarchive_project`, `attach_file_to_issue`) — Needs approval,
+`archive_project`, `unarchive_project`, `attach_file_to_issue`, `upload_project_file`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**: держите на Needs approval,
 а лучше на **Never**, если не нужны.
