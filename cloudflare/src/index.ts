@@ -91,6 +91,15 @@ function clean<T extends Record<string, unknown>>(obj: T): Partial<T> {
 	return out as Partial<T>;
 }
 
+/**
+ * Custom field values for an issue: [{ id, value }]. `value` is a string, or an
+ * array of strings for multi-value fields. Look up field ids with list_custom_fields.
+ */
+const CUSTOM_FIELDS_SCHEMA = z
+	.array(z.object({ id: z.number(), value: z.union([z.string(), z.array(z.string())]) }))
+	.optional()
+	.describe("Custom field values: [{id, value}]; value is a string, or array of strings for multi-value fields");
+
 // ---------------------------------------------------------------------------
 // MCP server
 // ---------------------------------------------------------------------------
@@ -207,6 +216,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				done_ratio: z.number().min(0).max(100).optional(),
 				is_private: z.boolean().optional(),
 				watcher_user_ids: z.array(z.number()).optional().describe("User ids to add as watchers"),
+				custom_fields: CUSTOM_FIELDS_SCHEMA,
 			},
 			async (a) => {
 				const issue = clean({
@@ -216,6 +226,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					tracker_id: a.tracker_id,
 					status_id: a.status_id,
 					priority_id: a.priority_id,
+					custom_fields: a.custom_fields,
 					assigned_to_id: a.assigned_to_id,
 					category_id: a.category_id,
 					parent_issue_id: a.parent_issue_id,
@@ -251,6 +262,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				estimated_hours: z.number().optional(),
 				done_ratio: z.number().min(0).max(100).optional(),
 				is_private: z.boolean().optional(),
+				custom_fields: CUSTOM_FIELDS_SCHEMA,
 				notes: z.string().optional(),
 				private_notes: z.boolean().optional(),
 			},
@@ -261,6 +273,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					project_id: a.project_id,
 					tracker_id: a.tracker_id,
 					status_id: a.status_id,
+					custom_fields: a.custom_fields,
 					priority_id: a.priority_id,
 					assigned_to_id: a.assigned_to_id,
 					category_id: a.category_id,
@@ -566,8 +579,14 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 
 		// ----- Reference data -----
 
-		this.server.tool("list_statuses", "List issue statuses (id + name).", {}, async () =>
+		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>
 			toResult(await redmineFetch(env, "GET", "/issue_statuses.json")),
+		);
+		this.server.tool(
+			"list_custom_fields",
+			"List custom field definitions (id, name, field_format, possible_values, ...). Requires admin rights in Redmine. Use to find field ids/formats for the custom_fields argument of create_issue/update_issue.",
+			{},
+			async () => toResult(await redmineFetch(env, "GET", "/custom_fields.json")),
 		);
 		this.server.tool("list_trackers", "List trackers / issue types (id + name).", {}, async () =>
 			toResult(await redmineFetch(env, "GET", "/trackers.json")),
