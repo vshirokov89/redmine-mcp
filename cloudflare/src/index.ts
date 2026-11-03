@@ -982,6 +982,77 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Issue categories -----
+		this.server.tool(
+			"list_issue_categories",
+			"List a project's issue categories (id, name, assigned_to).",
+			{ project_id: z.string().describe("Numeric id or identifier") },
+			async (a) => toResult(await redmineFetch(env, "GET", `/projects/${a.project_id}/issue_categories.json`)),
+		);
+
+		this.server.tool(
+			"get_issue_category",
+			"Get one issue category by id.",
+			{ category_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/issue_categories/${a.category_id}.json`)),
+		);
+
+		this.server.tool(
+			"create_issue_category",
+			"Create an issue category in a project.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				name: z.string(),
+				assigned_to_id: z.number().optional().describe("User who gets new issues in this category by default"),
+			},
+			async (a) => {
+				const issue_category = clean({ name: a.name, assigned_to_id: a.assigned_to_id });
+				return toResult(
+					await redmineFetch(env, "POST", `/projects/${a.project_id}/issue_categories.json`, {
+						body: { issue_category },
+					}),
+				);
+			},
+		);
+
+		this.server.tool(
+			"update_issue_category",
+			"Update an issue category's name and/or default assignee.",
+			{
+				category_id: z.number(),
+				name: z.string().optional(),
+				assigned_to_id: z.number().optional(),
+			},
+			async (a) => {
+				const issue_category = clean({ name: a.name, assigned_to_id: a.assigned_to_id });
+				if (Object.keys(issue_category).length === 0)
+					return { content: [{ type: "text", text: "Nothing to update: provide name or assigned_to_id." }], isError: true };
+				const r = await redmineFetch(env, "PUT", `/issue_categories/${a.category_id}.json`, {
+					body: { issue_category },
+				});
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Category ${a.category_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_issue_category",
+			"Delete an issue category. Optionally reassign its issues to another category.",
+			{
+				category_id: z.number(),
+				reassign_to_id: z.number().optional().describe("Move issues of this category to the category with this id"),
+			},
+			async (a) => {
+				const r = await redmineFetch(env, "DELETE", `/issue_categories/${a.category_id}.json`, {
+					params: clean({ reassign_to_id: a.reassign_to_id }),
+				});
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Category ${a.category_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>
