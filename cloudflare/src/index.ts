@@ -100,6 +100,39 @@ const CUSTOM_FIELDS_SCHEMA = z
 	.optional()
 	.describe("Custom field values: [{id, value}]; value is a string, or array of strings for multi-value fields");
 
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Upload raw file bytes to Redmine (POST /uploads.json). Returns the upload token
+ * in data.upload.token on success (201).
+ */
+async function redmineUpload(env: Env, filename: string, body: Uint8Array): Promise<RedmineResponse> {
+	const url = new URL("/uploads.json", env.REDMINE_URL);
+	url.searchParams.set("filename", filename);
+	const resp = await fetch(url.toString(), {
+		method: "POST",
+		headers: { "X-Redmine-API-Key": env.REDMINE_API_KEY, "Content-Type": "application/octet-stream" },
+		body,
+	});
+	const text = await resp.text();
+	let data: unknown = text;
+	try {
+		data = text ? JSON.parse(text) : { ok: true };
+	} catch {
+		/* keep raw */
+	}
+	return { status: resp.status, data };
+}
+
+/** Decode base64 (tolerating a leading data: URL prefix) to bytes. */
+function base64ToBytes(b64: string): Uint8Array {
+	const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+	const bin = atob(raw.trim());
+	const out = new Uint8Array(bin.length);
+	for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+	return out;
+}
+
 // ---------------------------------------------------------------------------
 // MCP server
 // ---------------------------------------------------------------------------
@@ -360,6 +393,144 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				const r = await redmineFetch(env, "DELETE", `/issues/${a.issue_id}/watchers/${a.user_id}.json`);
 				if (r.status === 204 || r.status === 200)
 					return { content: [{ type: "text", text: `User ${a.user_id} no longer watches #${a.issue_id}.` }] };
+				return toResult(r);
+			},
+		);
+
+		// ----- Attachments -----
+		this.server.tool(
+			"get_attachment",
+			"Get an attachment's metadata (filename, filesize, content_type, author, content_url).",
+			{ attachment_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/attachments/${a.attachment_id}.json`)),
+		);
+
+		this.server.tool(
+			"download_attachment",
+			"Read an attachment's content. Returns text for text files; for binary files returns metadata and the content_url (binary is not returned inline).",
+			{
+				attachment_id: z.number(),
+				max_bytes: z
+					.number()
+					.min(1)
+					.max(1048576)
+					.default(262144)
+					.describe("Max bytes of text to return (default 256 KiB)"),
+			},
+			async (a) => {
+				const meta = await redmineFetch(env, "GET", `/attachments/${a.attachment_id}.json`);
+				if (meta.status >= 400) return toResult(meta);
+				const att = (meta.data as {
+					attachment?: { content_url?: string; content_type?: string; filename?: string; filesize?: number };
+				}).attachment;
+				if (!att?.content_url)
+					return { content: [{ type: "text", text: "Attachment has no content_url." }], isError: true };
+				const ct = att.content_type ?? "";
+				const isText = /^text\/|json|xml|csv|javascript|yaml|x-sh|html/i.test(ct);
+				if (!isText) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `Binary attachment "${att.filename}" (${ct}, ${att.filesize} bytes). Download URL: ${att.content_url}`,
+							},
+						],
+					};
+				}
+				const resp = await fetch(att.content_url, { headers: { "X-Redmine-API-Key": env.REDMINE_API_KEY } });
+				if (!resp.ok)
+					return {
+						content: [{ type: "text", text: `Failed to download (HTTP ${resp.status}). URL: ${att.content_url}` }],
+						isError: true,
+					};
+				const buf = new Uint8Array(await resp.arrayBuffer());
+				const slice = buf.subarray(0, a.max_bytes);
+				const body = new TextDecoder().decode(slice);
+				const note = buf.length > slice.length ? `\n…(truncated, ${buf.length} bytes total)` : "";
+				return { content: [{ type: "text", text: `${att.filename} (${ct}):\n\n${body}${note}` }] };
+			},
+		);
+
+		this.server.tool(
+			"attach_file_to_issue",
+			"Attach a file to an existing issue. Provide the file as a URL to fetch, base64 bytes, or plain text. Uploads it then links it to the issue.",
+			{
+				issue_id: z.number(),
+				filename: z.string().describe("Name the file will have on the issue"),
+				url: z.string().optional().describe("http(s) URL to fetch the file from"),
+				content_base64: z.string().optional().describe("Base64-encoded bytes (a data: URL is also accepted)"),
+				text_content: z.string().optional().describe("Plain-text content, for text attachments"),
+				content_type: z.string().optional().describe("MIME type; optional, Redmine can detect it"),
+				description: z.string().optional(),
+			},
+			async (a) => {
+				let bytes: Uint8Array;
+				let ctype = a.content_type;
+				try {
+					if (a.url) {
+						if (!/^https?:\/\//i.test(a.url))
+							return { content: [{ type: "text", text: "url must start with http:// or https://" }], isError: true };
+						const r = await fetch(a.url);
+						if (!r.ok)
+							return { content: [{ type: "text", text: `Failed to fetch url (HTTP ${r.status}).` }], isError: true };
+						bytes = new Uint8Array(await r.arrayBuffer());
+						ctype = ctype ?? r.headers.get("content-type") ?? undefined;
+					} else if (a.content_base64) {
+						bytes = base64ToBytes(a.content_base64);
+					} else if (a.text_content !== undefined) {
+						bytes = new TextEncoder().encode(a.text_content);
+						ctype = ctype ?? "text/plain";
+					} else {
+						return {
+							content: [{ type: "text", text: "Provide one of: url, content_base64, text_content." }],
+							isError: true,
+						};
+					}
+				} catch (e) {
+					return { content: [{ type: "text", text: `Could not read file content: ${String(e)}` }], isError: true };
+				}
+				if (bytes.byteLength === 0)
+					return { content: [{ type: "text", text: "File is empty." }], isError: true };
+				if (bytes.byteLength > MAX_UPLOAD_BYTES)
+					return {
+						content: [
+							{ type: "text", text: `File too large (${bytes.byteLength} bytes; limit ${MAX_UPLOAD_BYTES}).` },
+						],
+						isError: true,
+					};
+
+				const up = await redmineUpload(env, a.filename, bytes);
+				if (up.status >= 400) return toResult(up);
+				const token = (up.data as { upload?: { token?: string } }).upload?.token;
+				if (!token)
+					return { content: [{ type: "text", text: `Upload returned no token (HTTP ${up.status}).` }], isError: true };
+
+				const upload = clean({ token, filename: a.filename, content_type: ctype, description: a.description });
+				const r = await redmineFetch(env, "PUT", `/issues/${a.issue_id}.json`, {
+					body: { issue: { uploads: [upload] } },
+				});
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Attached "${a.filename}" to issue #${a.issue_id}.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_attachment",
+			"DANGER: permanently delete an attachment. Irreversible.",
+			{
+				attachment_id: z.number(),
+				confirm: z.boolean().describe("Must be true to proceed — guards against accidental deletion."),
+			},
+			async (a) => {
+				if (!a.confirm)
+					return {
+						content: [{ type: "text", text: "Deletion not confirmed. Pass confirm=true to delete this attachment." }],
+						isError: true,
+					};
+				const r = await redmineFetch(env, "DELETE", `/attachments/${a.attachment_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Attachment ${a.attachment_id} deleted.` }] };
 				return toResult(r);
 			},
 		);
