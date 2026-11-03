@@ -74,6 +74,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Покажи мои проекты в Redmine»
 - «Какие есть статусы и трекеры?»
 - «Кто я в Redmine?» (инструмент whoami / current_user)
+- «Покажи мой профиль» / «Поменяй мою почту на new@example.ru» (`get_my_account` / `update_my_account`)
 
 **Вики**
 - «Покажи список вики-страниц проекта CRM»
@@ -98,7 +99,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Создай в CRM версию "Релиз 2026.1" со сроком 2026-12-31»
 - «Закрой версию 15» (status=closed)
 
-## Что умеет коннектор (78 инструментов)
+## Что умеет коннектор (80 инструментов)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -108,6 +109,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `whoami` | Кто вы (GitHub + Redmine), есть ли доступ |
 | `search` | Полнотекстовый поиск по всему Redmine (задачи, вики, новости, документы…) |
 | `current_user` | Ваш аккаунт Redmine |
+| `get_my_account` / `update_my_account` | Свой профиль / изменить свой профиль |
 | `list_issues` | Поиск задач с фильтрами (в т.ч. `query_id`, фильтр по кастомным полям `cf_x`) |
 | `get_issue` | Задача целиком (комментарии, вложения, связи) |
 | `create_issue` | Создать задачу/подзадачу (вкл. кастомные поля и вложение в один вызов) |
@@ -183,7 +185,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `add_group_user`, `remove_group_user`, `delete_group`, `create_membership`,
 `update_membership`, `delete_membership`, `create_user`, `update_user`,
 `delete_user`, `update_time_entry`, `delete_time_entry`, `save_wiki_page`,
-`delete_wiki_page`, `create_news`, `update_news`, `delete_news`) — Needs approval,
+`delete_wiki_page`, `create_news`, `update_news`, `delete_news`,
+`update_my_account`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**, **`delete_user`**,
 **`delete_group`**, **`delete_wiki_page`**: держите на Needs approval, а лучше на **Never**, если не нужны.

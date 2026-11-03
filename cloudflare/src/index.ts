@@ -1729,6 +1729,38 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 		this.server.tool("current_user", "Get the Redmine account tied to the configured API key.", {}, async () =>
 			toResult(await redmineFetch(env, "GET", "/users/current.json")),
 		);
+
+		// ----- My account -----
+		this.server.tool(
+			"get_my_account",
+			"Get your own account details (login, name, mail, api_key, custom fields).",
+			{},
+			async () => toResult(await redmineFetch(env, "GET", "/my/account.json")),
+		);
+		this.server.tool(
+			"update_my_account",
+			"Update your own account (firstname, lastname, mail, custom fields).",
+			{
+				firstname: z.string().optional(),
+				lastname: z.string().optional(),
+				mail: z.string().optional(),
+				custom_fields: CUSTOM_FIELDS_SCHEMA,
+			},
+			async (a) => {
+				const user = clean({
+					firstname: a.firstname,
+					lastname: a.lastname,
+					mail: a.mail,
+					custom_fields: a.custom_fields,
+				});
+				if (Object.keys(user).length === 0)
+					return { content: [{ type: "text", text: "Nothing to update: provide at least one field." }], isError: true };
+				const r = await redmineFetch(env, "PUT", "/my/account.json", { body: { user } });
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: "Your account was updated." }] };
+				return toResult(r);
+			},
+		);
 	}
 }
 
