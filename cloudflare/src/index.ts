@@ -1293,6 +1293,20 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Roles -----
+		this.server.tool(
+			"list_roles",
+			"List all roles (id, name). Use role ids with create_membership/update_membership.",
+			{},
+			async () => toResult(await redmineFetch(env, "GET", "/roles.json")),
+		);
+		this.server.tool(
+			"get_role",
+			"Get one role with its permissions and visibility settings (assignable, issues_visibility, time_entries_visibility, users_visibility, permissions).",
+			{ role_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/roles/${a.role_id}.json`)),
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>
