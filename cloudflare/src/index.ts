@@ -1307,6 +1307,133 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			async (a) => toResult(await redmineFetch(env, "GET", `/roles/${a.role_id}.json`)),
 		);
 
+		// ----- Users (mostly admin) -----
+		this.server.tool(
+			"list_users",
+			"List users. Requires admin rights. Filter by status, name (matches login/name/mail) or group.",
+			{
+				status: z
+					.enum(["active", "registered", "locked", "all"])
+					.optional()
+					.describe("Default active. 'all' returns every status."),
+				name: z.string().optional(),
+				group_id: z.number().optional(),
+				limit: z.number().min(1).max(100).default(100),
+				offset: z.number().min(0).default(0),
+			},
+			async (a) => {
+				const statusMap: Record<string, string> = { active: "1", registered: "2", locked: "3", all: "" };
+				const params = clean({
+					status: a.status ? statusMap[a.status] : undefined,
+					name: a.name,
+					group_id: a.group_id,
+					limit: a.limit,
+					offset: a.offset,
+				});
+				return toResult(await redmineFetch(env, "GET", "/users.json", { params }));
+			},
+		);
+
+		this.server.tool(
+			"get_user",
+			"Get one user. include=memberships,groups adds project roles and groups. (Full detail/api_key requires admin or your own record.)",
+			{ user_id: z.number(), include: z.string().optional().describe("Comma list: memberships, groups") },
+			async (a) =>
+				toResult(
+					await redmineFetch(env, "GET", `/users/${a.user_id}.json`, { params: clean({ include: a.include }) }),
+				),
+		);
+
+		this.server.tool(
+			"create_user",
+			"Create a user. Requires admin rights. Prefer generate_password + send_information so Redmine makes and emails the password (no plaintext password passes through here).",
+			{
+				login: z.string(),
+				firstname: z.string(),
+				lastname: z.string(),
+				mail: z.string().describe("Email address"),
+				password: z.string().optional().describe("Avoid if possible; prefer generate_password"),
+				auth_source_id: z.number().optional(),
+				mail_notification: z
+					.string()
+					.optional()
+					.describe("all | selected | only_my_events | only_assigned | only_owner | none"),
+				must_change_passwd: z.boolean().optional(),
+				generate_password: z.boolean().optional().describe("Let Redmine generate the password"),
+				admin: z.boolean().optional(),
+				send_information: z.boolean().optional().describe("Email account details to the new user"),
+			},
+			async (a) => {
+				const user = clean({
+					login: a.login,
+					firstname: a.firstname,
+					lastname: a.lastname,
+					mail: a.mail,
+					password: a.password,
+					auth_source_id: a.auth_source_id,
+					mail_notification: a.mail_notification,
+					must_change_passwd: a.must_change_passwd,
+					generate_password: a.generate_password,
+					admin: a.admin,
+				});
+				const body: Record<string, unknown> = { user };
+				if (a.send_information !== undefined) body.send_information = a.send_information;
+				return toResult(await redmineFetch(env, "POST", "/users.json", { body }));
+			},
+		);
+
+		this.server.tool(
+			"update_user",
+			"Update a user. Requires admin rights.",
+			{
+				user_id: z.number(),
+				login: z.string().optional(),
+				firstname: z.string().optional(),
+				lastname: z.string().optional(),
+				mail: z.string().optional(),
+				password: z.string().optional(),
+				admin: z.boolean().optional(),
+				status: z.number().optional().describe("1=active, 2=registered, 3=locked"),
+				mail_notification: z.string().optional(),
+				must_change_passwd: z.boolean().optional(),
+				generate_password: z.boolean().optional(),
+			},
+			async (a) => {
+				const user = clean({
+					login: a.login,
+					firstname: a.firstname,
+					lastname: a.lastname,
+					mail: a.mail,
+					password: a.password,
+					admin: a.admin,
+					status: a.status,
+					mail_notification: a.mail_notification,
+					must_change_passwd: a.must_change_passwd,
+					generate_password: a.generate_password,
+				});
+				if (Object.keys(user).length === 0)
+					return { content: [{ type: "text", text: "Nothing to update: provide at least one field." }], isError: true };
+				const r = await redmineFetch(env, "PUT", `/users/${a.user_id}.json`, { body: { user } });
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `User ${a.user_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_user",
+			"DANGER: permanently delete a user. Requires admin rights. Irreversible.",
+			{ user_id: z.number(), confirm: z.boolean().describe("Must be true to proceed.") },
+			async (a) => {
+				if (!a.confirm)
+					return { content: [{ type: "text", text: "Deletion not confirmed. Pass confirm=true." }], isError: true };
+				const r = await redmineFetch(env, "DELETE", `/users/${a.user_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `User ${a.user_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>

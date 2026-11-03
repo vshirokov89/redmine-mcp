@@ -58,6 +58,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Добавь пользователя 41 в проект CRM с ролью 3»
 - «Поменяй роли участника 58 на 3 и 4»
 
+**Пользователи** (нужны права администратора)
+- «Найди пользователя по имени Иванов»
+- «Создай пользователя: логин ivanov, имя Иван Иванов, почта ivanov@example.ru, пусть Redmine сам сгенерирует пароль и вышлет на почту»
+- «Заблокируй пользователя 58» (status=3)
+
 **Группы** (нужны права администратора)
 - «Покажи группы Redmine»
 - «Создай группу "Аналитики" и добавь туда пользователей 41 и 7»
@@ -82,7 +87,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Создай в CRM версию "Релиз 2026.1" со сроком 2026-12-31»
 - «Закрой версию 15» (status=closed)
 
-## Что умеет коннектор (61 инструмент)
+## Что умеет коннектор (66 инструментов)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -131,6 +136,9 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `list_time_entry_activities` | Виды деятельности для учёта времени |
 | `list_document_categories` | Категории документов |
 | `list_roles` / `get_role` | Роли / права и видимость роли |
+| `list_users` / `get_user` | Пользователи (список — admin) / один пользователь |
+| `create_user` / `update_user` | Создать / изменить пользователя (admin) |
+| `delete_user` | Удалить пользователя (admin, необратимо, с `confirm`) |
 | `list_groups` / `get_group` | Группы / одна группа (admin) |
 | `create_group` / `update_group` | Создать / изменить группу (admin) |
 | `delete_group` | Удалить группу (admin, с `confirm`) |
@@ -153,10 +161,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `update_issue_category`, `delete_issue_category`, `create_version`,
 `update_version`, `delete_version`, `create_group`, `update_group`,
 `add_group_user`, `remove_group_user`, `delete_group`, `create_membership`,
-`update_membership`, `delete_membership`) — Needs approval,
+`update_membership`, `delete_membership`, `create_user`, `update_user`,
+`delete_user`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
-**`delete_project`**, **`delete_issue`**, **`delete_attachment`**: держите на Needs approval,
-а лучше на **Never**, если не нужны.
+**`delete_project`**, **`delete_issue`**, **`delete_attachment`**, **`delete_user`**,
+**`delete_group`**: держите на Needs approval, а лучше на **Never**, если не нужны.
 
 ## Важно знать
 
