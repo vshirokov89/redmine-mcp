@@ -319,14 +319,159 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
-		// ----- Projects & reference data -----
+		// ----- Projects -----
+		const PROJECT_INCLUDE =
+			"Comma list: trackers, issue_categories, enabled_modules, time_entry_activities, issue_custom_fields";
+
 		this.server.tool(
 			"list_projects",
 			"List projects visible to the account.",
-			{ limit: z.number().min(1).max(100).default(100), offset: z.number().min(0).default(0) },
+			{
+				include: z.string().optional().describe(PROJECT_INCLUDE),
+				limit: z.number().min(1).max(100).default(100),
+				offset: z.number().min(0).default(0),
+			},
 			async (a) =>
-				toResult(await redmineFetch(env, "GET", "/projects.json", { params: { limit: a.limit, offset: a.offset } })),
+				toResult(
+					await redmineFetch(env, "GET", "/projects.json", {
+						params: clean({ include: a.include, limit: a.limit, offset: a.offset }),
+					}),
+				),
 		);
+
+		this.server.tool(
+			"get_project",
+			"Get one project by numeric id or identifier.",
+			{
+				project_id: z.string().describe("Numeric id or identifier, e.g. 'website'"),
+				include: z.string().optional().describe(PROJECT_INCLUDE),
+			},
+			async (a) =>
+				toResult(
+					await redmineFetch(env, "GET", `/projects/${a.project_id}.json`, {
+						params: clean({ include: a.include ?? "trackers,issue_categories,enabled_modules" }),
+					}),
+				),
+		);
+
+		this.server.tool(
+			"create_project",
+			"Create a project. Requires project-admin rights in Redmine.",
+			{
+				name: z.string(),
+				identifier: z
+					.string()
+					.describe("Unique url-safe identifier, 1-100 chars: lowercase letters, digits, - and _"),
+				description: z.string().optional(),
+				homepage: z.string().optional(),
+				is_public: z.boolean().optional(),
+				parent_id: z.number().optional().describe("Parent project id, to create a subproject"),
+				inherit_members: z.boolean().optional(),
+				tracker_ids: z.array(z.number()).optional(),
+				enabled_module_names: z
+					.array(z.string())
+					.optional()
+					.describe("e.g. issue_tracking, time_tracking, wiki, repository, boards, news, files, gantt, calendar, documents"),
+			},
+			async (a) => {
+				const project = clean({
+					name: a.name,
+					identifier: a.identifier,
+					description: a.description,
+					homepage: a.homepage,
+					is_public: a.is_public,
+					parent_id: a.parent_id,
+					inherit_members: a.inherit_members,
+					tracker_ids: a.tracker_ids,
+					enabled_module_names: a.enabled_module_names,
+				});
+				return toResult(await redmineFetch(env, "POST", "/projects.json", { body: { project } }));
+			},
+		);
+
+		this.server.tool(
+			"update_project",
+			"Update a project's fields. Requires project-admin rights in Redmine.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				name: z.string().optional(),
+				description: z.string().optional(),
+				homepage: z.string().optional(),
+				is_public: z.boolean().optional(),
+				parent_id: z.number().optional(),
+				inherit_members: z.boolean().optional(),
+				tracker_ids: z.array(z.number()).optional(),
+				enabled_module_names: z.array(z.string()).optional(),
+			},
+			async (a) => {
+				const project = clean({
+					name: a.name,
+					description: a.description,
+					homepage: a.homepage,
+					is_public: a.is_public,
+					parent_id: a.parent_id,
+					inherit_members: a.inherit_members,
+					tracker_ids: a.tracker_ids,
+					enabled_module_names: a.enabled_module_names,
+				});
+				if (Object.keys(project).length === 0) {
+					return { content: [{ type: "text", text: "Nothing to update: provide at least one field." }], isError: true };
+				}
+				const r = await redmineFetch(env, "PUT", `/projects/${a.project_id}.json`, { body: { project } });
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Project ${a.project_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"archive_project",
+			"Archive a project (hides it; reversible with unarchive_project). Redmine 5.0+.",
+			{ project_id: z.string().describe("Numeric id or identifier") },
+			async (a) => {
+				const r = await redmineFetch(env, "PUT", `/projects/${a.project_id}/archive.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Project ${a.project_id} archived.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"unarchive_project",
+			"Unarchive (restore) a previously archived project. Redmine 5.0+.",
+			{ project_id: z.string().describe("Numeric id or identifier") },
+			async (a) => {
+				const r = await redmineFetch(env, "PUT", `/projects/${a.project_id}/unarchive.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Project ${a.project_id} unarchived.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_project",
+			"DANGER: permanently delete a project AND all of its issues, wiki, time entries and subprojects. Irreversible. Requires project-admin rights.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				confirm: z
+					.boolean()
+					.describe("Must be true to proceed — guards against accidental deletion."),
+			},
+			async (a) => {
+				if (!a.confirm) {
+					return {
+						content: [{ type: "text", text: "Deletion not confirmed. Pass confirm=true to delete this project." }],
+						isError: true,
+					};
+				}
+				const r = await redmineFetch(env, "DELETE", `/projects/${a.project_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Project ${a.project_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
+		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id + name).", {}, async () =>
 			toResult(await redmineFetch(env, "GET", "/issue_statuses.json")),

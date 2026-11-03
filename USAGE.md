@@ -52,7 +52,12 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `add_issue_comment` | Добавить комментарий |
 | `list_time_entries` | Записи о времени |
 | `create_time_entry` | Залогировать часы |
-| `list_projects` | Список проектов |
+| `list_projects` | Список проектов (с `include`) |
+| `get_project` | Один проект по id/идентификатору |
+| `create_project` | Создать проект (нужны права админа) |
+| `update_project` | Изменить проект |
+| `archive_project` / `unarchive_project` | Архивировать / вернуть (Redmine 5.0+) |
+| `delete_project` | Удалить проект (необратимо, с `confirm`) |
 | `list_statuses` | Статусы задач |
 | `list_trackers` | Трекеры (типы задач) |
 | `list_priorities` | Приоритеты |
@@ -65,10 +70,12 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - ✋ **Needs approval** — спрашивать подтверждение (по умолчанию).
 - 🚫 **Never** — запретить.
 
-Рекомендуется: инструменты на **чтение** (`list_*`, `get_issue`, `current_user`,
+Рекомендуется: инструменты на **чтение** (`list_*`, `get_*`, `current_user`,
 `whoami`) — Always allow; на **запись** (`create_issue`, `update_issue`,
-`add_issue_comment`, `create_time_entry`) — Needs approval, чтобы ничего не
-менялось в Redmine без вашего «ок».
+`add_issue_comment`, `create_time_entry`, `create_project`, `update_project`,
+`archive_project`, `unarchive_project`) — Needs approval, чтобы ничего не
+менялось в Redmine без вашего «ок». Особо: **`delete_project`** удаляет проект со
+всеми задачами безвозвратно — держите на Needs approval, а лучше на **Never**, если он не нужен.
 
 ## Важно знать
 
