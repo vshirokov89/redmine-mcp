@@ -428,6 +428,62 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- Issue relations -----
+		this.server.tool(
+			"list_issue_relations",
+			"List an issue's relations (links to other issues).",
+			{ issue_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/issues/${a.issue_id}/relations.json`)),
+		);
+
+		this.server.tool(
+			"create_issue_relation",
+			"Link two issues. relation_type: relates | duplicates | duplicated | blocks | blocked | precedes | follows | copied_to | copied_from. delay (days) applies only to precedes/follows.",
+			{
+				issue_id: z.number().describe("The source issue"),
+				issue_to_id: z.number().describe("The related (target) issue"),
+				relation_type: z
+					.enum([
+						"relates",
+						"duplicates",
+						"duplicated",
+						"blocks",
+						"blocked",
+						"precedes",
+						"follows",
+						"copied_to",
+						"copied_from",
+					])
+					.default("relates"),
+				delay: z.number().optional().describe("Days of delay; only for precedes/follows"),
+			},
+			async (a) => {
+				const relation = clean({ issue_to_id: a.issue_to_id, relation_type: a.relation_type, delay: a.delay });
+				return toResult(
+					await redmineFetch(env, "POST", `/issues/${a.issue_id}/relations.json`, { body: { relation } }),
+				);
+			},
+		);
+
+		this.server.tool(
+			"get_issue_relation",
+			"Get one relation by its id (ids come from list_issue_relations).",
+			{ relation_id: z.number() },
+			async (a) => toResult(await redmineFetch(env, "GET", `/relations/${a.relation_id}.json`)),
+		);
+
+		this.server.tool(
+			"delete_issue_relation",
+			"Delete a relation (removes the link between two issues; reversible by recreating).",
+			{ relation_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "DELETE", `/relations/${a.relation_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Relation ${a.relation_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Attachments -----
 		this.server.tool(
 			"get_attachment",

@@ -30,6 +30,11 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Смени статус задачи #125634 на "Закрыта" и поставь 100% готовности»
 - «Добавь комментарий к #64564: жду ответ от службы безопасности»
 
+**Связи задач**
+- «Покажи связи задачи #125591»
+- «Сделай так, что #125591 блокирует #88569»
+- «Свяжи #125591 и #64564 как related»
+
 **Учёт времени**
 - «Залогируй 1.5 часа на задачу #88569, работал над интеграцией»
 - «Сколько времени я списал за эту неделю?»
@@ -54,7 +59,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Покажи файлы проекта CRM»
 - «Загрузи в проекте CRM файл по ссылке https://… под именем release.zip»
 
-## Что умеет коннектор (32 инструмента)
+## Что умеет коннектор (36 инструментов)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -71,6 +76,9 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `add_issue_comment` | Добавить комментарий |
 | `delete_issue` | Удалить задачу (необратимо, с `confirm`) |
 | `add_issue_watcher` / `remove_issue_watcher` | Добавить/убрать наблюдателя |
+| `list_issue_relations` | Связи задачи |
+| `create_issue_relation` | Связать две задачи (relates, blocks, precedes…) |
+| `get_issue_relation` / `delete_issue_relation` | Показать / удалить связь |
 | `get_attachment` | Метаданные вложения |
 | `download_attachment` | Прочитать содержимое (текст) или получить ссылку на скачивание |
 | `attach_file_to_issue` | Прикрепить файл к задаче (источник: URL, base64 или текст) |
@@ -102,7 +110,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 Рекомендуется: инструменты на **чтение** (`list_*`, `get_*`, `current_user`,
 `whoami`) — Always allow; на **запись** (`create_issue`, `update_issue`,
 `add_issue_comment`, `create_time_entry`, `create_project`, `update_project`,
-`archive_project`, `unarchive_project`, `attach_file_to_issue`, `upload_project_file`) — Needs approval,
+`archive_project`, `unarchive_project`, `attach_file_to_issue`, `upload_project_file`,
+`create_issue_relation`, `delete_issue_relation`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**: держите на Needs approval,
 а лучше на **Never**, если не нужны.
