@@ -130,11 +130,18 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			"Search Redmine issues. Defaults to open issues; pass status_id='*' for all or 'closed' for closed.",
 			{
 				project_id: z.string().optional().describe("Project identifier or numeric id"),
+				subproject_id: z.string().optional().describe("Subproject filter; '!*' excludes subprojects"),
 				status_id: z.string().optional().describe("Status id, or 'open' | 'closed' | '*'"),
 				assigned_to_id: z.string().optional().describe("Assignee user id, or 'me'"),
+				author_id: z.string().optional().describe("Author user id, or 'me'"),
 				tracker_id: z.number().optional(),
 				priority_id: z.number().optional(),
+				parent_id: z.number().optional().describe("Return subtasks of this issue"),
+				issue_id: z.string().optional().describe("One id or a comma-separated list of ids"),
 				subject: z.string().optional().describe("Substring match on the subject"),
+				created_on: z.string().optional().describe("Operator filter, e.g. '>=2026-01-01' or '><2026-01-01|2026-02-01'"),
+				updated_on: z.string().optional().describe("Operator filter, same format as created_on"),
+				include: z.string().optional().describe("Comma list: attachments, relations"),
 				sort: z.string().optional().describe("e.g. 'updated_on:desc'"),
 				limit: z.number().min(1).max(100).default(25),
 				offset: z.number().min(0).default(0),
@@ -142,11 +149,18 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			async (a) => {
 				const params = clean({
 					project_id: a.project_id,
+					subproject_id: a.subproject_id,
 					status_id: a.status_id ?? "open",
 					assigned_to_id: a.assigned_to_id,
+					author_id: a.author_id,
 					tracker_id: a.tracker_id,
 					priority_id: a.priority_id,
+					parent_id: a.parent_id,
+					issue_id: a.issue_id,
 					subject: a.subject ? `~${a.subject}` : undefined,
+					created_on: a.created_on,
+					updated_on: a.updated_on,
+					include: a.include,
 					sort: a.sort,
 					limit: a.limit,
 					offset: a.offset,
@@ -163,7 +177,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				include: z
 					.string()
 					.optional()
-					.describe("Comma list: journals,attachments,relations,children,watchers"),
+					.describe("Comma list: journals, attachments, relations, children, watchers, changesets, allowed_statuses"),
 			},
 			async (a) =>
 				toResult(
@@ -184,8 +198,15 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				status_id: z.number().optional(),
 				priority_id: z.number().optional(),
 				assigned_to_id: z.number().optional(),
+				category_id: z.number().optional(),
 				parent_issue_id: z.number().optional(),
-				fixed_version_id: z.number().optional(),
+				fixed_version_id: z.number().optional().describe("Target version/milestone id"),
+				start_date: z.string().optional().describe("YYYY-MM-DD"),
+				due_date: z.string().optional().describe("YYYY-MM-DD"),
+				estimated_hours: z.number().optional(),
+				done_ratio: z.number().min(0).max(100).optional(),
+				is_private: z.boolean().optional(),
+				watcher_user_ids: z.array(z.number()).optional().describe("User ids to add as watchers"),
 			},
 			async (a) => {
 				const issue = clean({
@@ -196,8 +217,15 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					status_id: a.status_id,
 					priority_id: a.priority_id,
 					assigned_to_id: a.assigned_to_id,
+					category_id: a.category_id,
 					parent_issue_id: a.parent_issue_id,
 					fixed_version_id: a.fixed_version_id,
+					start_date: a.start_date,
+					due_date: a.due_date,
+					estimated_hours: a.estimated_hours,
+					done_ratio: a.done_ratio,
+					is_private: a.is_private,
+					watcher_user_ids: a.watcher_user_ids,
 				});
 				return toResult(await redmineFetch(env, "POST", "/issues.json", { body: { issue } }));
 			},
@@ -210,10 +238,19 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				issue_id: z.number(),
 				subject: z.string().optional(),
 				description: z.string().optional(),
+				project_id: z.string().optional().describe("Move the issue to another project (id or identifier)"),
+				tracker_id: z.number().optional(),
 				status_id: z.number().optional(),
 				priority_id: z.number().optional(),
 				assigned_to_id: z.number().optional(),
+				category_id: z.number().optional(),
+				fixed_version_id: z.number().optional(),
+				parent_issue_id: z.number().optional(),
+				start_date: z.string().optional().describe("YYYY-MM-DD"),
+				due_date: z.string().optional().describe("YYYY-MM-DD"),
+				estimated_hours: z.number().optional(),
 				done_ratio: z.number().min(0).max(100).optional(),
+				is_private: z.boolean().optional(),
 				notes: z.string().optional(),
 				private_notes: z.boolean().optional(),
 			},
@@ -221,10 +258,19 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				const issue = clean({
 					subject: a.subject,
 					description: a.description,
+					project_id: a.project_id,
+					tracker_id: a.tracker_id,
 					status_id: a.status_id,
 					priority_id: a.priority_id,
 					assigned_to_id: a.assigned_to_id,
+					category_id: a.category_id,
+					fixed_version_id: a.fixed_version_id,
+					parent_issue_id: a.parent_issue_id,
+					start_date: a.start_date,
+					due_date: a.due_date,
+					estimated_hours: a.estimated_hours,
 					done_ratio: a.done_ratio,
+					is_private: a.is_private,
 					notes: a.notes,
 					private_notes: a.notes && a.private_notes ? true : undefined,
 				});
@@ -254,6 +300,53 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				const r = await redmineFetch(env, "PUT", `/issues/${a.issue_id}.json`, { body: { issue } });
 				if (r.status === 204 || r.status === 200)
 					return { content: [{ type: "text", text: `Comment added to #${a.issue_id}.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_issue",
+			"DANGER: permanently delete an issue (and its subtasks). Irreversible.",
+			{
+				issue_id: z.number(),
+				confirm: z.boolean().describe("Must be true to proceed — guards against accidental deletion."),
+			},
+			async (a) => {
+				if (!a.confirm) {
+					return {
+						content: [{ type: "text", text: "Deletion not confirmed. Pass confirm=true to delete this issue." }],
+						isError: true,
+					};
+				}
+				const r = await redmineFetch(env, "DELETE", `/issues/${a.issue_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `Issue #${a.issue_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"add_issue_watcher",
+			"Add a user as a watcher of an issue.",
+			{ issue_id: z.number(), user_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "POST", `/issues/${a.issue_id}/watchers.json`, {
+					body: { user_id: a.user_id },
+				});
+				if (r.status === 204 || r.status === 200 || r.status === 201)
+					return { content: [{ type: "text", text: `User ${a.user_id} now watches #${a.issue_id}.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"remove_issue_watcher",
+			"Remove a watcher from an issue.",
+			{ issue_id: z.number(), user_id: z.number() },
+			async (a) => {
+				const r = await redmineFetch(env, "DELETE", `/issues/${a.issue_id}/watchers/${a.user_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `User ${a.user_id} no longer watches #${a.issue_id}.` }] };
 				return toResult(r);
 			},
 		);

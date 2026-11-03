@@ -50,6 +50,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `create_issue` | Создать задачу/подзадачу |
 | `update_issue` | Изменить поля и/или добавить комментарий |
 | `add_issue_comment` | Добавить комментарий |
+| `delete_issue` | Удалить задачу (необратимо, с `confirm`) |
+| `add_issue_watcher` / `remove_issue_watcher` | Добавить/убрать наблюдателя |
 | `list_time_entries` | Записи о времени |
 | `create_time_entry` | Залогировать часы |
 | `list_projects` | Список проектов (с `include`) |
@@ -76,6 +78,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `archive_project`, `unarchive_project`) — Needs approval, чтобы ничего не
 менялось в Redmine без вашего «ок». Особо: **`delete_project`** удаляет проект со
 всеми задачами безвозвратно — держите на Needs approval, а лучше на **Never**, если он не нужен.
+То же касается **`delete_issue`** — удаляет задачу необратимо.
 
 ## Важно знать
 
