@@ -84,6 +84,10 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Покажи файлы проекта CRM»
 - «Загрузи в проекте CRM файл по ссылке https://… под именем release.zip»
 
+**Новости**
+- «Покажи последние новости Redmine»
+- «Опубликуй в проекте CRM новость "Релиз 2026.1" с кратким описанием …»
+
 **Категории задач**
 - «Покажи категории задач проекта CRM»
 - «Создай в CRM категорию "Поддержка", исполнитель по умолчанию — пользователь 41»
@@ -94,7 +98,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 - «Создай в CRM версию "Релиз 2026.1" со сроком 2026-12-31»
 - «Закрой версию 15» (status=closed)
 
-## Что умеет коннектор (73 инструмента)
+## Что умеет коннектор (78 инструментов)
 
 > Полный перечень поддерживаемых методов. Актуализируется при каждом изменении
 > функционала коннектора.
@@ -132,6 +136,9 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `list_wiki_pages` / `get_wiki_page` | Вики: список страниц / страница (с версиями) |
 | `save_wiki_page` | Создать/обновить вики-страницу (+ вложение) |
 | `delete_wiki_page` | Удалить вики-страницу (необратимо, с `confirm`) |
+| `list_news` / `get_news` | Новости (глобально/по проекту) / одна новость |
+| `create_news` / `update_news` | Создать / изменить новость |
+| `delete_news` | Удалить новость (с `confirm`) |
 | `list_project_files` | Файлы проекта (модуль «Файлы») |
 | `upload_project_file` | Загрузить файл в проект (URL / base64 / текст) |
 | `list_issue_categories` / `get_issue_category` | Категории задач проекта / одна категория |
@@ -176,7 +183,7 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 `add_group_user`, `remove_group_user`, `delete_group`, `create_membership`,
 `update_membership`, `delete_membership`, `create_user`, `update_user`,
 `delete_user`, `update_time_entry`, `delete_time_entry`, `save_wiki_page`,
-`delete_wiki_page`) — Needs approval,
+`delete_wiki_page`, `create_news`, `update_news`, `delete_news`) — Needs approval,
 чтобы ничего не менялось в Redmine без вашего «ок». Особо опасные (необратимое удаление) —
 **`delete_project`**, **`delete_issue`**, **`delete_attachment`**, **`delete_user`**,
 **`delete_group`**, **`delete_wiki_page`**: держите на Needs approval, а лучше на **Never**, если не нужны.

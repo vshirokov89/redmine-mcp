@@ -1591,6 +1591,105 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		// ----- News -----
+		this.server.tool(
+			"list_news",
+			"List news. Without project_id, lists news across all projects; with it, that project's news.",
+			{
+				project_id: z.string().optional().describe("Limit to this project (id or identifier)"),
+				limit: z.number().min(1).max(100).default(25),
+				offset: z.number().min(0).default(0),
+			},
+			async (a) => {
+				const path = a.project_id ? `/projects/${a.project_id}/news.json` : "/news.json";
+				return toResult(await redmineFetch(env, "GET", path, { params: { limit: a.limit, offset: a.offset } }));
+			},
+		);
+
+		this.server.tool(
+			"get_news",
+			"Get one news item by id.",
+			{ news_id: z.number(), include: z.string().optional().describe("Comma list: attachments, comments") },
+			async (a) =>
+				toResult(await redmineFetch(env, "GET", `/news/${a.news_id}.json`, { params: clean({ include: a.include }) })),
+		);
+
+		this.server.tool(
+			"create_news",
+			"Post a news item to a project.",
+			{
+				project_id: z.string().describe("Numeric id or identifier"),
+				title: z.string(),
+				summary: z.string().optional(),
+				description: z.string().optional(),
+				attachment: ATTACHMENT_SCHEMA,
+			},
+			async (a) => {
+				const news: Record<string, unknown> = clean({
+					title: a.title,
+					summary: a.summary,
+					description: a.description,
+				});
+				if (a.attachment) {
+					const resolved = await resolveUploadBytes(a.attachment);
+					if ("error" in resolved) return { content: [{ type: "text", text: resolved.error }], isError: true };
+					if (resolved.bytes.byteLength > MAX_UPLOAD_BYTES)
+						return {
+							content: [{ type: "text", text: `Attachment too large (limit ${MAX_UPLOAD_BYTES} bytes).` }],
+							isError: true,
+						};
+					const up = await redmineUpload(env, a.attachment.filename, resolved.bytes);
+					if (up.status >= 400) return toResult(up);
+					const token = (up.data as { upload?: { token?: string } }).upload?.token;
+					if (!token)
+						return { content: [{ type: "text", text: `Upload returned no token (HTTP ${up.status}).` }], isError: true };
+					news.uploads = [
+						clean({
+							token,
+							filename: a.attachment.filename,
+							content_type: resolved.ctype,
+							description: a.attachment.description,
+						}),
+					];
+				}
+				return toResult(await redmineFetch(env, "POST", `/projects/${a.project_id}/news.json`, { body: { news } }));
+			},
+		);
+
+		this.server.tool(
+			"update_news",
+			"Update a news item.",
+			{
+				news_id: z.number(),
+				title: z.string().optional(),
+				summary: z.string().optional(),
+				description: z.string().optional(),
+			},
+			async (a) => {
+				const news = clean({ title: a.title, summary: a.summary, description: a.description });
+				if (Object.keys(news).length === 0)
+					return { content: [{ type: "text", text: "Nothing to update: provide at least one field." }], isError: true };
+				const r = await redmineFetch(env, "PUT", `/news/${a.news_id}.json`, { body: { news } });
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `News ${a.news_id} updated.` }] };
+				return toResult(r);
+			},
+		);
+
+		this.server.tool(
+			"delete_news",
+			"Delete a news item (irreversible).",
+			{ news_id: z.number(), confirm: z.boolean().describe("Must be true to proceed.") },
+			async (a) => {
+				if (!a.confirm)
+					return { content: [{ type: "text", text: "Deletion not confirmed. Pass confirm=true." }], isError: true };
+				const r = await redmineFetch(env, "DELETE", `/news/${a.news_id}.json`);
+				if (r.status === 204 || r.status === 200)
+					return { content: [{ type: "text", text: `News ${a.news_id} deleted.` }] };
+				return toResult(r);
+			},
+		);
+
 		// ----- Reference data -----
 
 		this.server.tool("list_statuses", "List issue statuses (id, name, is_closed).", {}, async () =>
