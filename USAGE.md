@@ -131,8 +131,8 @@ Claude сам поймёт, что нужен Redmine, и вызовет нуж�
 | `delete_time_entry` | Удалить запись времени |
 | `list_projects` | Список проектов (с `include`) |
 | `get_project` | Один проект по id/идентификатору |
-| `create_project` | Создать проект (нужны права админа) |
-| `update_project` | Изменить проект |
+| `create_project` | Создать проект (нужны права админа; вкл. кастомные поля) |
+| `update_project` | Изменить проект (вкл. кастомные поля) |
 | `archive_project` / `unarchive_project` | Архивировать / вернуть (Redmine 5.0+) |
 | `delete_project` | Удалить проект (необратимо, с `confirm`) |
 | `list_wiki_pages` / `get_wiki_page` | Вики: список страниц / страница (с версиями) |

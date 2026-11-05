@@ -982,6 +982,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					.array(z.string())
 					.optional()
 					.describe("e.g. issue_tracking, time_tracking, wiki, repository, boards, news, files, gantt, calendar, documents"),
+				custom_fields: CUSTOM_FIELDS_SCHEMA,
 			},
 			async (a) => {
 				const project = clean({
@@ -994,6 +995,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					inherit_members: a.inherit_members,
 					tracker_ids: a.tracker_ids,
 					enabled_module_names: a.enabled_module_names,
+					custom_fields: a.custom_fields,
 				});
 				return toResult(await redmineFetch(env, "POST", "/projects.json", { body: { project } }));
 			},
@@ -1012,6 +1014,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				inherit_members: z.boolean().optional(),
 				tracker_ids: z.array(z.number()).optional(),
 				enabled_module_names: z.array(z.string()).optional(),
+				custom_fields: CUSTOM_FIELDS_SCHEMA,
 			},
 			async (a) => {
 				const project = clean({
@@ -1023,6 +1026,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					inherit_members: a.inherit_members,
 					tracker_ids: a.tracker_ids,
 					enabled_module_names: a.enabled_module_names,
+					custom_fields: a.custom_fields,
 				});
 				if (Object.keys(project).length === 0) {
 					return { content: [{ type: "text", text: "Nothing to update: provide at least one field." }], isError: true };
@@ -1739,7 +1743,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 		);
 		this.server.tool(
 			"list_custom_fields",
-			"List custom field definitions (id, name, field_format, possible_values, ...). Requires admin rights in Redmine. Use to find field ids/formats for the custom_fields argument of create_issue/update_issue.",
+			"List custom field definitions (id, name, field_format, possible_values, ...). Requires admin rights in Redmine. Use to find field ids/formats for the custom_fields argument of create_issue/update_issue, create_project/update_project, and the time-entry tools.",
 			{},
 			async () => toResult(await redmineFetch(env, "GET", "/custom_fields.json")),
 		);
